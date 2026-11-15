@@ -20,7 +20,7 @@ class SessionEngine:
         self.state = state
 
     async def run(self, emit, text_hint: str = "", t0: int | None = None,
-                  t1: int | None = None) -> dict:
+                  t1: int | None = None, pcm: bytes | None = None) -> dict:
         t0 = t0 or ms()
         t1 = t1 or t0
         degrade: list[str] = []
@@ -28,10 +28,13 @@ class SessionEngine:
         # --- ASR -------------------------------------------------------
         t_asr = ms()
         try:
-            text = await asyncio.wait_for(self.asr.final(text_hint),
+            text = await asyncio.wait_for(self.asr.final(text_hint, pcm=pcm),
                                           timeout=settings.asr_timeout_ms / 1000)
         except asyncio.TimeoutError:
             degrade.append("asr_timeout")
+            text = text_hint or "我没听清。"
+        except Exception:
+            degrade.append("asr_unavailable")
             text = text_hint or "我没听清。"
         t2 = ms()
 
@@ -45,6 +48,11 @@ class SessionEngine:
             payload = {"evidence": [{"quote": text[:10], "trait": "courage", "why": "兜底"}],
                        "scores": {"courage": 5, "ambition": 4, "wisdom": 4, "loyalty": 4},
                        "line": "唔……让我看看。你身上有股不服气的劲儿。"}
+        except Exception:
+            degrade.append("llm_unavailable")
+            payload = {"evidence": [{"quote": text[:10], "trait": "courage", "why": "兜底"}],
+                       "scores": {"courage": 5, "ambition": 4, "wisdom": 4, "loyalty": 4},
+                       "line": "唔……让我看看。"}
         t3 = ms()
 
         verdict = judge.decide(text, payload, list(self.state.recent_houses),
@@ -54,7 +62,9 @@ class SessionEngine:
             degrade.append("quote_fail")
 
         # --- TTS -------------------------------------------------------
-        tts_text = verdict["line"]
+        from .persona import pick_announcement
+        announce_text, variant = pick_announcement(verdict["house"], self.state.sessions)
+        tts_text = verdict["line"]  # bridge sentence (LLM); announcement is pre-recorded
         await emit(protocol.tts("start", 1, tts_text))
         t_tts = ms()
         try:
@@ -63,6 +73,9 @@ class SessionEngine:
         except asyncio.TimeoutError:
             degrade.append("tts_timeout")
             frames = self.tts.synth("唔……") if hasattr(self.tts, "synth") else []
+        except Exception:
+            degrade.append("tts_unavailable")
+            frames = []
         for i, f in enumerate(frames):
             await emit(protocol.audio_frame(i, f))
         t4 = ms()
@@ -73,8 +86,9 @@ class SessionEngine:
             "asr_ms": t2 - t1, "llm_ms": t3 - t2, "tts_ms": t4 - t3,
             "host_ms": t4 - t1, "degrade": degrade,
         }
-        await emit(protocol.result(verdict["house"], verdict["reasons"],
-                                   verdict["line"], latency))
+        await emit(protocol.result(verdict["house"], verdict["reasons"], announce_text, latency,
+                                   announce={"variant": variant,
+                                             "file": f"{verdict['house']}-{variant + 1}.opus"}))
         self.state.recent_houses.append(verdict["house"])
         self.state.sessions += 1
         self.state.last_stats = {"house": verdict["house"], "latency": latency,

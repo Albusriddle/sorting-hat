@@ -45,10 +45,14 @@ def tts(state: str, seg: int = 0, text: str = "") -> dict:
     return msg
 
 
-def result(house: str, reasons: list[str], line: str, latency: dict) -> dict:
+def result(house: str, reasons: list[str], line: str, latency: dict,
+           announce: dict | None = None) -> dict:
     assert house in HOUSES
-    return {"type": "result", "house": house, "reasons": reasons,
-            "line": line, "latency": latency}
+    msg = {"type": "result", "house": house, "reasons": reasons,
+           "line": line, "latency": latency}
+    if announce:
+        msg["announce"] = announce
+    return msg
 
 
 def bye(reason: str, dev_ts: dict | None = None) -> dict:

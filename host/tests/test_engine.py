@@ -7,7 +7,7 @@ from app.state import AppState
 
 
 class SlowASR(MockASR):
-    async def final(self, text_hint=""):
+    async def final(self, text_hint="", pcm=None):
         await asyncio.sleep(0.2)
         return "慢"
 
@@ -33,6 +33,9 @@ async def test_happy_path_events():
     assert any(isinstance(m, (bytes, bytearray)) and m[0] == 0x02 for m in sent)
     assert out["latency"]["host_ms"] >= 0
     assert out["verdict"]["house"] in ("courage", "ambition", "wisdom", "loyalty")
+    res = [m for m in sent if isinstance(m, dict) and m.get("type") == "result"][0]
+    assert res["announce"]["file"].startswith(res["house"] + "-")
+    assert res["line"] and res["announce"]["variant"] in (0, 1, 2)
 
 
 @pytest.mark.asyncio

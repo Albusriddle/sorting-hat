@@ -7,14 +7,12 @@ from . import protocol
 from .config import settings
 from .engine import SessionEngine, ms
 from .metrics import record
-from .providers import MockASR, MockLLM, MockTTS
+from .providers import build_providers
 from .state import STATE
 
 device_app = FastAPI(title="sortinghat-device")
 
-ASR = MockASR()
-LLM = MockLLM()
-TTS = MockTTS()
+ASR, LLM, TTS = build_providers(settings)
 ENGINE = SessionEngine(ASR, LLM, TTS, STATE)
 
 

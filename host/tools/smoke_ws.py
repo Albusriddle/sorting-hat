@@ -28,7 +28,8 @@ async def main() -> int:
                 print("tts start %.0f ms" % ((time.monotonic() - t1) * 1000))
             elif d["type"] == "result":
                 result = d
-                print("result:", d["house"], d["reasons"], "host_ms=", d["latency"]["host_ms"])
+                print("result:", d["house"], d["reasons"], "host_ms=", d["latency"]["host_ms"],
+                      "announce=", d.get("announce"))
                 break
         print("audio frames:", frames)
         return 0 if result and frames > 0 else 1

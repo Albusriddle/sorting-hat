@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 import hashlib
+from functools import lru_cache
 from pathlib import Path
 import yaml
 
@@ -28,3 +29,17 @@ def preroll_dir() -> Path:
 
 def sha256_of(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+@lru_cache(maxsize=1)
+def _lines() -> dict:
+    return load_lines().get("lines", {})
+
+
+def pick_announcement(house: str, n: int) -> tuple[str, int]:
+    """Deterministic rotation over the pre-recorded announcement variants."""
+    opts = _lines().get(house) or []
+    if not opts:
+        return ("", 0)
+    v = n % len(opts)
+    return (opts[v], v)

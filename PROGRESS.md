@@ -11,12 +11,15 @@
 | 5 | 判决（argmax + 反集中 + 引原话） | `pytest` 15 passed |
 | 6 | 协议消息与错误码白名单 | `pytest` 覆盖 |
 | 7 | 大屏 `/stats` + 控制台页 | `curl localhost:8080/` |
+| 8 | AWS 三个 adapter（Bedrock / Polly / Transcribe） | `docs/providers.md`；无凭证时 preheat 失败即 fail-closed |
+| 9 | 12 句宣布词占位（4 院 × 3） | `host/persona/lines.yaml`，`preheat` 校验 12 文件 |
 
 ## 待办（需要硬件/凭证）
 
 - [ ] ESP32-S3 刷机出声（A）
 - [ ] 真实 AWS/Alibaba provider 接入（B，按 `docs/providers.md`）
-- [ ] 8 句预录音频（C 录制 → `host/assets/preroll/`）
+- [ ] 12 句预录音频（C 录制 → `host/assets/preroll/{house}-{1..3}.opus`）
+- [ ] Opus→PCM 解码（否则 Transcribe 只能拿到 `pcm=None` 降级）
 - [ ] 设备 `bye.dev_ts` 回传（A）→ 才能算 `TTFC = t5b − t0`
 - [ ] 彩排 3 次（全员）
 

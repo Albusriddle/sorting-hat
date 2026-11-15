@@ -33,7 +33,7 @@ class MockASR(Provider):
     def __init__(self, canned: str = ""):
         self.canned = canned
 
-    async def final(self, text_hint: str = "") -> str:
+    async def final(self, text_hint: str = "", pcm: bytes | None = None) -> str:
         await asyncio.sleep(0.02)
         return text_hint or self.canned or "我最想要的是被认可，但我又不想说出来。"
 
@@ -108,3 +108,13 @@ class MockTTS(Provider):
             frames.append(bytes(buf))
             sent += self.frame_ms
         return frames
+
+
+def build_providers(cfg) -> tuple:
+    """Return (asr, llm, tts) according to cfg.*_provider. Default is mock."""
+    from .providers_aws import BedrockLLM, PollyTTS, TranscribeASR  # lazy: boto3 only inside
+
+    asr = TranscribeASR() if cfg.asr_provider in ("aws", "transcribe") else MockASR()
+    llm = BedrockLLM(model_id=cfg.bedrock_model_id) if cfg.llm_provider in ("aws", "bedrock") else MockLLM()
+    tts = PollyTTS() if cfg.tts_provider in ("aws", "polly") else MockTTS()
+    return asr, llm, tts
