@@ -1,4 +1,4 @@
-# 协议（指针）
+# 协议（仓库内唯一事实源）
 
-唯一事实源：`sortinghat/analysis/00-protocol.md`（工作区根目录下）。
-本仓库不复制以防漂移；如需离线版，用 `tools/sync_protocol.sh` 同步并记录 sha。
+完整协议见 [`docs/design/00-protocol.md`](design/00-protocol.md)（与本仓库同版本）。
+设备侧实现参考 `fw/`；服务端实现参考 `host/app/protocol.py`。
