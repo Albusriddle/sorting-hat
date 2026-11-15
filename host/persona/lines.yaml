@@ -1,0 +1,14 @@
+# 8 announcement lines: 4 houses x 2 variants. These are pre-recorded, never synthesised live.
+lines:
+  courage:
+    - 赤翎！你这种人，墙在前面也当门用。
+    - 赤翎。别回头，你要去的地方还没修好路。
+  ambition:
+    - 玄渊。你想要的东西不小，那就去拿。
+    - 玄渊！眼睛别只盯着别人的位置。
+  wisdom:
+    - 星枢。你脑子转得比嘴快，去那儿慢慢想。
+    - 星枢。想明白再动手，你不缺那几分钟。
+  loyalty:
+    - 穗垣。你护着的人不少，继续护着。
+    - 穗垣！别忘了也给自己留一个位置。

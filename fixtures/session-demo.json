@@ -1,0 +1,6 @@
+{
+  "name": "session-demo",
+  "text": "我最想要的是被认可，但我又不想说出来。",
+  "recent": ["wisdom", "loyalty"],
+  "expect": {"house_any_of": ["courage", "ambition", "wisdom", "loyalty"]}
+}

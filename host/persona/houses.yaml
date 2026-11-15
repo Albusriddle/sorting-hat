@@ -1,0 +1,23 @@
+# Wire value -> display. Slug is frozen at G3; display names are the IP-downgraded set.
+houses:
+  - slug: courage
+    name: 赤翎
+    color: "#C0392B"
+    motto: 先撞了再说
+    keys: [赢, 冲, 敢, 不服]
+  - slug: ambition
+    name: 玄渊
+    color: "#1F6F5C"
+    motto: 想要就得拿
+    keys: [想要, 目标, 第一, 认可]
+  - slug: wisdom
+    name: 星枢
+    color: "#2C3E70"
+    motto: 想清楚再动
+    keys: [想, 为什么, 琢磨, 书]
+  - slug: loyalty
+    name: 穗垣
+    color: "#8A6B2E"
+    motto: 护住身边的人
+    keys: [朋友, 家, 一起, 守]
+display_order: [courage, ambition, wisdom, loyalty]

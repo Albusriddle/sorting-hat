@@ -1,0 +1,11 @@
+item,spec,qty,unit_price_cny,gram,note
+hat,大号棕色毛毡巫师帽,2,120,150,当场称重 <=150 g 才买
+mcu,ESP32-S3 N16R8 开发板,2,45,10,16MB Flash / 8MB PSRAM
+mic,INMP441 I2S 数字麦,2,8,2,SNR 61 dB（低于官方建议，6 天版换）
+amp,MAX98357A 功放,2,5,3,
+speaker,36mm 4Ω 3W 腔体喇叭,2,8,14,
+battery,1000mAh 3.7V LiPo + 保护板,2,12,20,持续 >=1.5A / 保护板 >=2A
+charger,TP4056 + 5V 升压,2,3,6,
+led,WS2812 8 灯环,2,4,6,限亮度 30%
+switch,FPC 微动 + 反射近距,2,3,3,
+wire,28AWG 细线/热缩/接插件,1,15,15,
