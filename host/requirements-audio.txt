@@ -1,0 +1,5 @@
+# Optional: enables Opus decode (0x01 frames -> PCM for ASR).
+# Windows: PyOgg ships opus.dll, so opuslib can find it via the DLL path we add.
+# Linux/macOS: install libopus (apt install libopus0 / brew install opus); opuslib only.
+opuslib==3.0.1
+PyOgg==0.6.14a1; sys_platform == "win32"

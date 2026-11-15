@@ -4,7 +4,7 @@
 
 | 环节 | mock（默认） | AWS（已实现） | 状态 |
 |---|---|---|---|
-| ASR | `MockASR`（按传入文本） | `TranscribeASR`（`start_stream_transcription`, zh-CN） | 代码就绪，**需先接 Opus→PCM 解码** |
+| ASR | `MockASR`（按传入文本） | `TranscribeASR`（`start_stream_transcription`, zh-CN） | **已接 Opus 解码**（opuslib + pyogg 的 opus.dll）；无库时走 `0x04` PCM 回退 |
 | LLM | `MockLLM`（关键词打分） | `BedrockLLM`（`converse` + JSON 解析/校验） | 代码就绪，需凭证 |
 | TTS | `MockTTS`（220 Hz 正弦，验证链路） | `PollyTTS`（`synthesize_speech` pcm 16 kHz） | 代码就绪，**只做过桥句，不宣布学院** |
 
@@ -38,13 +38,12 @@ python tasks.py preheat      # 必须 ok:true，providers 步骤逐个报 health
 2. **`house` 不由模型输出**：Bedrock 只返回 `evidence/scores/line`，`house = argmax` 由 `app/judge.py` 计算。
 3. **结构化输出要预热**：Bedrock 新 schema 首编译最长 ~90 s，客户端读超时设 **150 s**；`preheat` 打真 schema，不要打样例。
 
-## 3. ASR 的已知缺口
+## 3. Opus 解码（已接）
 
-`TranscribeASR.final(text_hint, pcm=...)` 需要 16 kHz/16 bit PCM；当前网关**只统计 Opus 帧、不解码**，所以 `pcm=None` 会抛 `AsrUnavailable` → 引擎标记 `asr_unavailable` 并降级为提示句。
-
-补齐方式（二选一）：
-- 网关装 `opuslib`（需系统 libopus），把 `0x01` 帧解成 PCM 再调 `final(pcm=...)`；
-- 或设备侧同时上传一路 16 kHz PCM 仅供 ASR（带宽 ×4，但零解码）。
+- `app/opus_codec.py`：先试 `opuslib`，失败则把 `pyogg` 自带的 `opus.dll` 目录加入 DLL 搜索路径再试一次。
+- 设备 `0x01` 帧 → 解码成 16 kHz PCM → 存入 `SessionAudio`（单会话上限 120 s）→ `speech_end` 时交给 ASR。
+- 若运行环境仍无 libopus：设备可改发 `0x04` 帧（16 kHz PCM），网关同样收；ASR 不会缺输入。
+- 自检：`/stats` 的 `audio` 字段应看到 `decoded > 0`、`opus: true`。
 
 ## 4. 测试
 

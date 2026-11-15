@@ -4,6 +4,7 @@ import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from . import protocol
+from .audio import SessionAudio
 from .config import settings
 from .engine import SessionEngine, ms
 from .metrics import record
@@ -33,6 +34,7 @@ async def voice(ws: WebSocket):
         return
     await ws.accept(subprotocol=protocol.PROTOCOL)
     sid = protocol.new_sid()
+    audio = SessionAudio()
     await ws.send_json(protocol.ready(sid))
 
     async def emit(m):
@@ -54,16 +56,20 @@ async def voice(ws: WebSocket):
                 t = data.get("type")
                 if t == "listen" and data.get("state") == "start":
                     last_text = ""
+                    audio.reset()
                 elif t == "vad" and data.get("ev") == "speech_end":
                     if STATE.halt == "stop_all":
                         await ws.send_json(protocol.error("rate_limited", "halt", False))
                         continue
                     t1 = ms()
+                    pcm = audio.pcm()
+                    STATE.last_audio = audio.stats()
                     task = asyncio.create_task(
-                        ENGINE.run(emit, last_text, t0=t1, t1=t1))
+                        ENGINE.run(emit, last_text, t0=t1, t1=t1, pcm=pcm))
                 elif t == "abort":
                     if task and not task.done():
                         task.cancel()
+                    audio.reset()
                     await ws.send_json(protocol.bye("doff"))
                 elif t == "ping":
                     await ws.send_json({"type": "pong"})
@@ -71,8 +77,13 @@ async def voice(ws: WebSocket):
                     break
             elif msg.get("bytes") is not None:
                 b = msg["bytes"]
-                # 0x01 | seq u32 | opus. We do not decode in the MVP.
-                if not b or b[0] != 0x01:
+                # 0x01 | seq u32 | opus   -> decode to PCM for ASR
+                # 0x04 | seq u32 | pcm    -> device-supplied 16 kHz PCM (fallback)
+                if b and b[0] == 0x01:
+                    audio.push_opus(b[5:])
+                elif b and b[0] == 0x04:
+                    audio.push_pcm(b[5:])
+                else:
                     await ws.send_json(protocol.error("bad_frame", "dropped", False))
                     STATE.errors += 1
     except WebSocketDisconnect:

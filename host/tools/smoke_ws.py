@@ -1,6 +1,9 @@
 """End-to-end smoke: connect WS, speak, expect tts + result. No device needed."""
-import asyncio, json, sys, time
+import asyncio, json, math, struct, sys, time
 import websockets
+
+sys.path.insert(0, ".")
+from app import opus_codec  # noqa: E402
 
 TOKEN = "dev-token"
 URL = "ws://127.0.0.1:8443/v1/voice"
@@ -14,7 +17,11 @@ async def main() -> int:
         ready = json.loads(await ws.recv())
         print("ready:", ready["sid"], ready["audio"])
         await ws.send(json.dumps({"type": "listen", "state": "start"}))
-        await ws.send(b"\x01" + (0).to_bytes(4, "big") + b"\x00" * 20)
+        pcm = b"".join(struct.pack("<h", int(3000 * math.sin(2 * math.pi * 300 * i / 16000)))
+                       for i in range(960))
+        frame = opus_codec.encode_pcm(pcm) or b"\x00" * 20
+        await ws.send(b"\x01" + (0).to_bytes(4, "big") + frame)
+        print("opus available:", opus_codec.available(), "frame bytes:", len(frame))
         await ws.send(json.dumps({"type": "vad", "ev": "speech_end"}))
         t1 = time.monotonic()
         frames, result = 0, None

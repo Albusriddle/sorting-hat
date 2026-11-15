@@ -11,6 +11,7 @@ class AppState:
     halt: str = "none"                     # none | halt_new | stop_all
     recent_houses: deque = field(default_factory=lambda: deque(maxlen=3))
     last_stats: dict = field(default_factory=dict)
+    last_audio: dict = field(default_factory=dict)
     sessions: int = 0
     errors: int = 0
     config: dict = field(default_factory=dict)
@@ -23,6 +24,7 @@ class AppState:
             "sessions": self.sessions,
             "errors": self.errors,
             "last": self.last_stats,
+            "audio": self.last_audio,
             "config": self.config,
         }
 

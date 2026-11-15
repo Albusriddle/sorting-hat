@@ -19,7 +19,8 @@
 - [ ] ESP32-S3 刷机出声（A）
 - [ ] 真实 AWS/Alibaba provider 接入（B，按 `docs/providers.md`）
 - [ ] 12 句预录音频（C 录制 → `host/assets/preroll/{house}-{1..3}.opus`）
-- [ ] Opus→PCM 解码（否则 Transcribe 只能拿到 `pcm=None` 降级）
+- [x] Opus→PCM 解码（opuslib + pyogg 的 opus.dll；`/stats.audio.decoded` 实测 1）
+- [ ] 设备端 `0x04` PCM 回退通道（代码已支持，固件待加）
 - [ ] 设备 `bye.dev_ts` 回传（A）→ 才能算 `TTFC = t5b − t0`
 - [ ] 彩排 3 次（全员）
 
