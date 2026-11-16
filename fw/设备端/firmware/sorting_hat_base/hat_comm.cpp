@@ -126,7 +126,8 @@ static void on_text(uint8_t* payload, size_t len) {
     } else if (strcmp(st, "stop") == 0) {
       hat_ts_stamp(&HatTs::tStop);
       hat_ts_dump();
-      tts.stop();                 // 停 CSK4002（否则桥接句会继续念完）
+      // 正常结束不调 tts.stop()：让 CSK4002 把句子念完；
+      // 只有 abort/按钮打断才硬停（见 .ino 的 handle_button / case 'b'）。
       hw_speaker_stop();
       hw_mic_enable(true);
       if (hat_state_get() == HatState::SPEAKING) comm_go(HatState::ARMED, "TTS_STOP");

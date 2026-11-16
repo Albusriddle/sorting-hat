@@ -110,3 +110,43 @@ def test_two_sessions_one_connection_after_bye_done():
     rows = tail(200)
     assert len(rows) >= before + 2
     assert rows[-2].get("ttfc_ms") == 2 and rows[-1].get("ttfc_ms") == 2
+
+
+def test_text_with_zero_pcm_still_judges():
+    """有 text 时零 PCM 也要判院（烧板联调问题 1）。"""
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        ws.send_json({"type": "listen", "state": "start"})
+        ws.send_json({"type": "text", "text": "我最怕输，但我更怕自己在关键时候退缩。"})
+        ws.send_bytes(b"\x04" + b"\x00\x00\x00\x00" + b"\x00" * 640)
+        ws.send_json({"type": "vad", "ev": "speech_end"})
+        for _ in range(400):
+            m = ws.receive()
+            if "bytes" in m:
+                continue
+            d = json.loads(m["text"])
+            if d["type"] == "result":
+                assert d["house"] == "courage"
+                return
+        raise AssertionError("zero-pcm text session must still produce result")
+
+
+def test_noise_without_text_does_not_judge():
+    """无 text + mock：底噪(±121)不能骗出学院（烧板联调里的临时绕过）。"""
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        ws.send_json({"type": "listen", "state": "start"})
+        ws.send_bytes(b"\x04" + b"\x00\x00\x00\x00" + (121).to_bytes(2, "little", signed=True) * 320)
+        ws.send_json({"type": "vad", "ev": "speech_end"})
+        kinds = []
+        for _ in range(60):
+            m = ws.receive()
+            if "bytes" in m:
+                continue
+            d = json.loads(m["text"])
+            kinds.append(d["type"])
+            if d["type"] == "result":
+                raise AssertionError("noise without text must not judge")
+            if d["type"] == "tts" and d.get("state") == "stop":
+                return
+        raise AssertionError(f"no tts stop, saw {kinds}")

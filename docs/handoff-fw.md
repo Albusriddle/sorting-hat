@@ -23,7 +23,7 @@
 | F2 | 桥接句出声 | `hat_comm.cpp` 的 `tts{start}` → `tts.speakUTF8(text)` | 1 m 处听到"唔……让我看看。"这类整句 |
 | F3 | 唤醒改 5 号 | `hat_config.h` 的 `ASR_WAKE_WORD_ID 5`；模块烧 5 条（1–4 内容，5 唤醒） | 串口 `A` 打印 `[INTENT] 识别到 1 号`；说"分院帽"（5 号）能唤醒 |
 | F4 | `result` 后补 `bye{done}` | `hat_comm.cpp` 的 `result` 分支（已加） | 串口 `[WS-TX] bye done (dev_ts …)`；host `/v1/sessions` 的 `ttfc_ms` 非空 |
-| F5 | `tts{stop}` 停合成 | `hat_comm.cpp`（已加 `tts.stop()`） | 桥接句念到一半被打断会立刻停 |
+| F5 | `tts{stop}` **不要**硬停合成 | `hat_comm.cpp` 的 stop 分支去掉 `tts.stop()`；只在 `abort`/按钮里停 | 桥接句能念完；按 `b` 能立刻打断 |
 | F6 | 功放 LRC 改 21 | `hat_config.h` 的 `PIN_SPK_LRC 21`（无 SPK，仅防冲突） | 编译通过；接线时不要再接 16 |
 
 ## 3. 硬件侧需要确认的
@@ -67,3 +67,15 @@ host 侧对应检查：`/stats` 有 `last.text`；`/v1/sessions` 有 `ttfc_ms`�
 - Opus/VAD 真机验证。
 - 明文 ws（现场内网，TLS 留 `REQUIRE_TLS` 开关）。
 - 12 句预录（改为可选；设备 TTS 直接念院名）。
+
+---
+
+## 7. 2026-11-17 联调后的变更（host 侧已改，固件只需重烧 F5）
+
+| # | 联调问题 | host 修法 | 固件要做什么 |
+|---|---|---|---|
+| 1 | 零音频闸挡住 `text` | 有 `text` 直接进引擎；无 `text` 且 provider=mock 时不再凭 pcm 判院 | 无；**请删掉 ±121 底噪绕过** |
+| 2 | 第二次 `tts start` 像"没念" | `0x02` 帧按 60 ms/帧节拍发，`t4` 取首帧；`result` 在桥接句播完后才到 | 重烧 F5：`tts{stop}` 不硬停，只有 `abort`/按钮才停 |
+| 3 | 会话结束后静音计时还在跑 | 计时按"轮"：`vad` 即取消，失败不重挂，`bye` 取消 | 无；不会再收到莫名的 `bye{silence}` |
+
+**验收**：`w`→`A`→`e`（全零 PCM）应出 `result`；静音 6.5 s 的救场句能完整念完；失败一轮后等 20 s 不应收到 `bye`。

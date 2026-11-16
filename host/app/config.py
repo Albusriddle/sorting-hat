@@ -38,6 +38,7 @@ class Settings:
     asr_timeout_ms: int = int(_env("ASR_TIMEOUT_MS", "600"))
     llm_timeout_ms: int = int(_env("LLM_TIMEOUT_MS", "900"))
     tts_timeout_ms: int = int(_env("TTS_TIMEOUT_MS", "800"))
+    tts_pace_ms: int = int(_env("TTS_PACE_MS", "60"))
 
     # judge
     history_window: int = int(_env("HISTORY_WINDOW", "10"))

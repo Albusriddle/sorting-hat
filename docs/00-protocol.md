@@ -40,3 +40,6 @@
 - 全零/低能量音频（RMS < `MIN_AUDIO_RMS`）不判院，只回"没听清"。
 - **VAD 归属**：由设备判定（能量阈值 + 300 ms 尾点），host 只响应 `vad{speech_end}`，**不自己跑 VAD**。
 - `bye{reason:"done"}` 表示本次会话结束但连接继续；host 收到后落库并保留连接。
+- **一次会话的固定顺序**：`listen{start}` → `text`（可选）→ `vad{speech_end}` → `tts{start}`（桥接句）→ `0x02` 帧（默认 60 ms/帧节拍）→ `tts{stop}` → `result` → 设备 `bye{done,dev_ts}`。
+- `result.line` 是给人看的宣布句，**设备不要念它**；设备按 `house` 念本地 GBK 院名。
+- `tts{stop}` 只表示"这一句发完了"，设备**不要**据此硬停合成；硬停只发生在 `abort`/按钮打断。

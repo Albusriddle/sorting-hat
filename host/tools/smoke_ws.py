@@ -16,8 +16,8 @@ async def main() -> int:
         print("ready:", ready["sid"], ready["audio"])
         await ws.send(json.dumps({"type": "listen", "state": "start"}))
         await ws.send(json.dumps({"type": "text", "text": TEXT}))
-        pcm = b"".join(struct.pack("<h", int(3000 * math.sin(2 * math.pi * 300 * i / 16000)))
-                       for i in range(960))
+        # 真机没有麦，上行是全零；这里也发全零，验证"有 text 就判院"
+        pcm = b"\x00" * 640
         await ws.send(b"\x04" + (0).to_bytes(4, "big") + pcm)
         await ws.send(json.dumps({"type": "vad", "ev": "speech_end"}))
         t1 = time.monotonic()

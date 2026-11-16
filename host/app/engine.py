@@ -22,7 +22,7 @@ class SessionEngine:
         self.tts = tts
         self.state = state
 
-    async def _speak(self, emit, text: str, degrade: list[str]) -> None:
+    async def _speak(self, emit, text: str, degrade: list[str]) -> int:
         await emit(protocol.tts("start", 1, text))
         try:
             frames = await asyncio.wait_for(self.tts.synth_async(text),
@@ -33,9 +33,12 @@ class SessionEngine:
         except Exception:
             degrade.append("tts_unavailable")
             frames = []
+        t_first = ms()
         for i, f in enumerate(frames):
             await emit(protocol.audio_frame(i, f))
+            await asyncio.sleep(settings.tts_pace_ms / 1000)   # 默认 60 ms/帧
         await emit(protocol.tts("stop", 1))
+        return t_first
 
     async def run(self, emit, text_hint: str = "", t0: int | None = None,
                   t1: int | None = None, pcm: bytes | None = None,
@@ -91,8 +94,7 @@ class SessionEngine:
 
         # ---- TTS 只念与学院无关的桥接句，避免"念 A 宣布 B" ----
         bridge = bridge_line(self.state.sessions)
-        await self._speak(emit, bridge, degrade)
-        t4 = ms()
+        t4 = await self._speak(emit, bridge, degrade)   # 首帧即 t4，别把整段音频算进延迟
 
         house = verdict["house"]
         announce_text, variant = pick_announcement(house, self.state.sessions)

@@ -72,6 +72,7 @@ async def voice(ws: WebSocket):
             frames = TTS.synth("唔……") if hasattr(TTS, "synth") else []
         for i, f in enumerate(frames):
             await emit(protocol.audio_frame(i, f))
+            await asyncio.sleep(settings.tts_pace_ms / 1000)   # 默认 60 ms/帧，避免 stop 立刻掐断
         await emit(protocol.tts("stop", 1))
 
     task: asyncio.Task | None = None
@@ -193,11 +194,17 @@ async def voice(ws: WebSocket):
                     pcm = audio.pcm()
                     stats = {**audio.stats(), "rms": pcm_rms(pcm)}
                     STATE.set_audio(sid, stats)
-                    await cancel(silence_task)
+                    await cancel(silence_task, watchdog)   # 计时按"轮"，本轮到此结束
                     t0 = ms()
-                    if not pcm or stats["rms"] < settings.min_audio_rms:
+                    has_text = bool((last_text or "").strip())
+                    if has_text:
+                        pass                                # 有文字就用文字，完全不看音频
+                    elif settings.asr_provider == "mock":
+                        # mock ASR 不看 pcm，不能凭"底噪"凭空判院
                         await send_tts_line("唔……我没听清，再说一次？")
-                        silence_task = start_silence()   # 重新挂上救场/收尾计时
+                        continue
+                    elif not pcm or stats["rms"] < settings.min_audio_rms:
+                        await send_tts_line("唔……我没听清，再说一次？")
                         continue
                     task = asyncio.create_task(ENGINE.run(emit, last_text, t0=t0, t1=ms(),
                                                           pcm=pcm, sid=sid))
