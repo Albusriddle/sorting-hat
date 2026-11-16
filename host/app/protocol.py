@@ -30,7 +30,7 @@ def ready(sid: str, *, in_fmt=None, out_fmt=None, budget_ms=None, vad=None) -> d
         "sid": sid,
         "proto": 1,
         "audio": {
-            "in": in_fmt or "pcm16/16000/20ms",
+            "in": in_fmt or "pcm16|opus/16000/20ms",
             "out": out_fmt or "pcm16/16000/60ms",
         },
         "budget_ms": budget_ms if budget_ms is not None else settings.budget_ms,

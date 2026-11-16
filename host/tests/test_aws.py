@@ -46,3 +46,14 @@ def test_factory_selects_aws(monkeypatch):
     monkeypatch.setattr(settings, "tts_provider", "aws")
     asr, llm, tts = build_providers(settings)
     assert asr.name == "transcribe" and llm.name == "bedrock" and tts.name == "polly"
+
+
+def test_refuse_passthrough():
+    out = BedrockLLM._validate({"refuse": True, "line": "这顶帽子不管这个。"})
+    assert out["refuse"] is True and out["line"].startswith("这顶帽子")
+
+
+def test_missing_scores_still_raises():
+    import pytest as _pytest
+    with _pytest.raises(ValueError):
+        BedrockLLM._validate({"evidence": []})

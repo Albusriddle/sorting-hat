@@ -40,7 +40,7 @@
 #define PIN_MIC_WS       5      // INMP441 WS
 #define PIN_MIC_SD       6      // INMP441 SD
 #define PIN_SPK_BCLK     15     // MAX98357A BCLK
-#define PIN_SPK_LRC      16     // MAX98357A LRC   ⚠ 与 ASR SDA16 冲突，接线前必须确认
+#define PIN_SPK_LRC      21     // MAX98357A LRC（原 16 与 ASR SDA 冲突，改 21）
 #define PIN_SPK_DIN      7      // MAX98357A DIN
 #define PIN_LED          48     // WS2812 ×8
 #define PIN_BTN          0      // 按钮（短按=打断，长按 2 s=静音）

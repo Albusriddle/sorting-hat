@@ -1,33 +1,34 @@
-# 进度（截至 2026-11-15 22:5x）
+# 进度（截至 2026-11-16 11:40）
 
 ## 已完成（本机可复现）
 
 | # | 事项 | 证据 |
 |---|---|---|
-| 1 | 仓库骨架（七目录） | `python tools/check_tree.py` → missing: none |
-| 2 | 上位机 MVP（WS + 管理面 + 控制台） | `python -m app.run`；`/healthz` 200 |
-| 3 | 六步预热 | `POST /v1/preheat` → `ok:true`，6 步全绿，60 ms |
-| 4 | 端到端冒烟（无设备） | `python tools/smoke_ws.py` → 连接 42 ms、`tts start` 52 ms、`result` 56 ms、20 帧音频 |
-| 5 | 判决（argmax + 反集中 + 引原话） | `pytest` 31 passed |
-| 6 | 协议消息与错误码白名单 | `pytest` 覆盖 |
-| 7 | 大屏 `/stats` + 控制台页 | `curl localhost:8080/` |
-| 8 | AWS 三个 adapter（Bedrock / Polly / Transcribe） | `docs/providers.md`；无凭证时 preheat 失败即 fail-closed |
-| 9 | 12 句宣布词占位（4 院 × 3） | `host/persona/lines.yaml`，`preheat` 校验 12 文件 |
+| 1 | 仓库七目录 + 实物版 pinmap/bom | `python tools/check_tree.py`；`hw/pinmap.md`、`hw/bom.csv` |
+| 2 | 上位机网关/编排/判决/管理面/大屏 | `python tasks.py up`；`/healthz`、`/stats` |
+| 3 | 六步预热（preroll 可选） | `python tasks.py preheat` → `ok:true`，`degraded=[preroll_placeholder]` |
+| 4 | 端到端冒烟（无设备） | `python tasks.py smoke` → `house=loyalty`、`scores`、`announce` |
+| 5 | 单测 | `python tasks.py test` → **34 passed** |
+| 6 | 设备端固件（Arduino） | `fw/设备端/firmware/sorting_hat_base/`（A 上传） |
+| 7 | 学院名双套 + 编译开关 | `gen_phrases.py` 生成；`HAT_HOUSE_ORIGINAL` 切换 |
+| 8 | 词条映射 → text 通路 | 设备 `hat_intent`；host `text` 分支；冒烟验证 |
+| 9 | 零音频闸 / 鉴权等值 / halt / watchdog / 落库 | S-01…S-17 修复记录见 `sortinghat/问题清单/上位机问题清单.md` §8 |
 
 ## 待办（需要硬件/凭证）
 
-- [ ] ESP32-S3 刷机出声（A）
-- [ ] 真实 AWS/Alibaba provider 接入（B，按 `docs/providers.md`）
-- [ ] 12 句预录音频（C 录制 → `host/assets/preroll/{house}-{1..3}.opus`）
-- [x] Opus→PCM 解码（opuslib + pyogg 的 opus.dll；`/stats.audio.decoded` 实测 1）
-- [ ] 设备端 `0x04` PCM 回退通道（代码已支持，固件待加）
-- [ ] 设备 `bye.dev_ts` 回传（A）→ 才能算 `TTFC = t5b − t0`
+- [ ] **烧板验证** S-05（学院名）、S-07（桥接句出声）、S-08（唤醒 5 号、按钮入口）——需要 Arduino IDE
+- [ ] AWS 凭证（`ASR_PROVIDER/LLM_PROVIDER/TTS_PROVIDER=aws` 后 `preheat` 全绿）
+- [ ] 12 句正式预录（**可选**；`PRERECORD_REQUIRED=1` 才强制）
+- [ ] 真实麦克风（INMP441/USB 声卡）接上后把 0x04 换成真 PCM，即可启用 Transcribe
 - [ ] 彩排 3 次（全员）
 
 ## 命令
+
 ```bash
-cd host && python -m pytest -q
-python -m app.run                       # device :8443 / admin :8080
-curl -s -X POST localhost:8080/v1/preheat -H "X-Admin-Token: dev-token"
-python host/tools/smoke_ws.py
+cd host && cp .env.example .env      # 改 DEVICE_TOKEN / ADMIN_TOKEN
+python tasks.py test                 # 34 passed
+python tasks.py up                   # device :8443 / admin :8080
+python tasks.py preheat
+python tasks.py ready                # 200
+python tasks.py smoke                # text -> result
 ```

@@ -71,6 +71,10 @@ def decide(text: str, payload: dict, recent: list[str], *,
                 "degraded": True}
 
     evidence = list(payload.get("evidence", []))
+    if not evidence:
+        return {"house": None, "insufficient": True, "reasons": [], "scores": scores,
+                "line": "", "quote_ok": False, "quote_failures": ["no evidence"],
+                "degraded": True}
     reasons = [str(e.get("quote", "")).strip() for e in evidence][:3]
     reasons = [r for r in reasons if r] or [text[:12]]
 

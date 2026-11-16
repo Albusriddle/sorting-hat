@@ -93,6 +93,8 @@ class BedrockLLM(Provider):
 
     @staticmethod
     def _validate(data: dict) -> dict:
+        if data.get("refuse"):
+            return {"refuse": True, "line": str(data.get("line", "这顶帽子不管这个。"))[:60]}
         if not isinstance(data.get("scores"), dict):
             raise ValueError("missing scores")
         scores = {}

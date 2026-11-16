@@ -1,13 +1,20 @@
-# 上位机 Runbook（90 秒上台）
+# 上台手册（Windows / macOS 通用）
 
-1. `cd host && pip install -r requirements.txt`（首次）
-2. `make up`（device 8443 / admin 8080）
-3. `make preheat` → 必须 200 且 `ok:true`
-4. `make ready` → 200
-5. `make smoke` → 看到 `result:` 与 `audio frames > 0`
-6. 设备上电 → 戴上 → 说 2 句
+1. `cd host && cp .env.example .env`，改 `DEVICE_TOKEN` / `ADMIN_TOKEN`；设备 `secrets.h` 的 `TOKEN` 与之一致。
+2. `pip install -r requirements.txt`（可选 `-r requirements-audio.txt`）。
+3. `python tasks.py test` → 34 passed。
+4. `python tasks.py up`（device :8443 / admin :8080）。
+5. `python tasks.py preheat` → `ok:true`；若 `degraded:["preroll_placeholder"]` 可上台（宣布句走设备 TTS）。
+6. `python tasks.py ready` → 200。
+7. `python tasks.py smoke` → 看到 `result ... announce=...`。
+8. 设备上电 → 戴上/按 `w` → 说预置台词（或按 `A-D` 模拟）→ 帽子念院名。
 
 ## 故障速查
-- 设备连不上：手机热点？防火墙 8443？证书 SAN？
-- 帽子不响：`/stats` 看 last.house；没有则看 WS 日志
-- 延迟高：`/v1/sessions` 看 t1–t4 哪段超
+
+| 现象 | 先查 |
+|---|---|
+| 设备 403 | `DEVICE_TOKEN` 与 `secrets.h` 的 `TOKEN` 是否一致 |
+| 帽子不响 | `/stats` 有无 `last.house`；串口 `[TTS] house=` 有没有 |
+| 只听到"没听清" | `/stats.audio.rms` 是否 <50（无麦时是 0，走 `text` 才对） |
+| readyz 503 | `python tasks.py preheat`，看哪个 required 步骤红 |
+| 大屏空白 | 大屏必须从 `127.0.0.1:8080` 打开，或带 `X-Admin-Token` |

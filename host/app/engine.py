@@ -107,8 +107,8 @@ class SessionEngine:
                                              "file": f"{house}-{variant + 1}.opus"}))
         self.state.recent_for(sid or "").append(house)
         self.state.sessions += 1
-        self.state.last_stats = {"house": house, "latency": latency, "text": text,
-                                 "reasons": verdict["reasons"], "scores": verdict["scores"],
-                                 "quote_ok": verdict["quote_ok"], "sid": sid}
+        self.state.set_stats(sid or "", {"house": house, "latency": latency, "text": text,
+                                         "reasons": verdict["reasons"], "scores": verdict["scores"],
+                                         "quote_ok": verdict["quote_ok"], "sid": sid})
         return {"text": text, "verdict": verdict, "latency": latency,
                 "degrade": degrade, "sid": sid}

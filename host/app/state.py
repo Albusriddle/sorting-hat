@@ -13,6 +13,8 @@ class AppState:
     halt: str = "none"                     # none | halt_new | stop_all
     last_stats: dict = field(default_factory=dict)
     last_audio: dict = field(default_factory=dict)
+    session_stats: dict = field(default_factory=dict)
+    session_audio: dict = field(default_factory=dict)
     sessions: int = 0
     errors: int = 0
     config: dict = field(default_factory=dict)
@@ -24,8 +26,21 @@ class AppState:
             self._recent[key] = deque(maxlen=settings.history_window)
         return self._recent[key]
 
+    def set_stats(self, sid: str, stats: dict) -> None:
+        key = sid or "_"
+        self.session_stats[key] = stats
+        self.last_stats = stats
+
+    def set_audio(self, sid: str, audio: dict) -> None:
+        key = sid or "_"
+        self.session_audio[key] = audio
+        self.last_audio = audio
+
     def drop_sid(self, sid: str) -> None:
-        self._recent.pop(sid or "_", None)
+        key = sid or "_"
+        self._recent.pop(key, None)
+        self.session_stats.pop(key, None)
+        self.session_audio.pop(key, None)
 
     def snapshot(self) -> dict:
         return {

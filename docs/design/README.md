@@ -1,3 +1,7 @@
+> **历史快照（2026-11-15）**：以下文档描述的是 ESP32-S3 + INMP441 + MAX98357A + xiaozhi 路线的设计。
+> 11-16 实物改为 ESP32-WROOM-32D + LD3320A + XFS5152、Arduino 自建固件，**这些文档中的硬件/协议字段（`t` 键、`opus/24k`、`hello/caps`）已不适用**。
+> 现状以根目录 `README.md`、`docs/00-protocol.md`、`host/app/protocol.py` 为准。
+
 # 设计文档归档
 
 > 这些文档是「掂量帽 / Sorting Hat」在 2026-11-15 一天的产出，按评审流水线归档。

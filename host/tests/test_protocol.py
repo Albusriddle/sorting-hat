@@ -5,7 +5,8 @@ from app import protocol
 def test_ready_shape():
     m = protocol.ready("s-1")
     assert m["type"] == "ready" and m["sid"] == "s-1"
-    assert m["audio"]["in"].startswith("pcm16/")
+    assert m["audio"]["in"].startswith("pcm16")
+    assert "16000" in m["audio"]["in"]
     assert "16000" in m["audio"]["out"]
     assert m["budget_ms"] == 1240
 

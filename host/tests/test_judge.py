@@ -50,3 +50,9 @@ def test_share_cap_forces_runner_up():
 def test_insufficient_returns_no_house():
     v = judge.decide("嗯。", {"insufficient": True}, [])
     assert v["insufficient"] is True and v["house"] is None
+
+
+def test_empty_evidence_is_insufficient():
+    v = judge.decide("随便说点什么", {"scores": {"courage": 3, "ambition": 3,
+                                                "wisdom": 3, "loyalty": 3}}, [])
+    assert v["insufficient"] is True and v["house"] is None

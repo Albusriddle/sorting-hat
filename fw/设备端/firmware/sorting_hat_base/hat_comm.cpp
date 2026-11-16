@@ -126,6 +126,7 @@ static void on_text(uint8_t* payload, size_t len) {
     } else if (strcmp(st, "stop") == 0) {
       hat_ts_stamp(&HatTs::tStop);
       hat_ts_dump();
+      tts.stop();                 // 停 CSK4002（否则桥接句会继续念完）
       hw_speaker_stop();
       hw_mic_enable(true);
       if (hat_state_get() == HatState::SPEAKING) comm_go(HatState::ARMED, "TTS_STOP");
