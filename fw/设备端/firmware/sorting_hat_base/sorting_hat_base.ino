@@ -165,10 +165,31 @@ static void handle_serial() {
       break;
 
     case 'a': tts.speakGBK(PH_ASK, sizeof(PH_ASK)); break;
-    case '1': tts.speakGBK(PH_GRYFFINDOR, sizeof(PH_GRYFFINDOR)); break;
-    case '2': tts.speakGBK(PH_SLYTHERIN, sizeof(PH_SLYTHERIN)); break;
-    case '3': tts.speakGBK(PH_RAVENCLAW, sizeof(PH_RAVENCLAW)); break;
-    case '4': tts.speakGBK(PH_HUFFLEPUFF, sizeof(PH_HUFFLEPUFF)); break;
+    // 1-4 = 试听四院预录句，跟着 HAT_HOUSE_ORIGINAL 走（与 hat_comm.cpp 的 speak_house 一致）
+    case '1':
+#if HAT_HOUSE_ORIGINAL
+      tts.speakGBK(PH_HOUSE_COURAGE_ORIG, sizeof(PH_HOUSE_COURAGE_ORIG)); break;
+#else
+      tts.speakGBK(PH_HOUSE_COURAGE, sizeof(PH_HOUSE_COURAGE)); break;
+#endif
+    case '2':
+#if HAT_HOUSE_ORIGINAL
+      tts.speakGBK(PH_HOUSE_AMBITION_ORIG, sizeof(PH_HOUSE_AMBITION_ORIG)); break;
+#else
+      tts.speakGBK(PH_HOUSE_AMBITION, sizeof(PH_HOUSE_AMBITION)); break;
+#endif
+    case '3':
+#if HAT_HOUSE_ORIGINAL
+      tts.speakGBK(PH_HOUSE_WISDOM_ORIG, sizeof(PH_HOUSE_WISDOM_ORIG)); break;
+#else
+      tts.speakGBK(PH_HOUSE_WISDOM, sizeof(PH_HOUSE_WISDOM)); break;
+#endif
+    case '4':
+#if HAT_HOUSE_ORIGINAL
+      tts.speakGBK(PH_HOUSE_LOYALTY_ORIG, sizeof(PH_HOUSE_LOYALTY_ORIG)); break;
+#else
+      tts.speakGBK(PH_HOUSE_LOYALTY, sizeof(PH_HOUSE_LOYALTY)); break;
+#endif
 
     case 'p': hat_intent_dump(); break;        // 打印词条表
 

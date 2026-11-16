@@ -17,9 +17,18 @@ static uint8_t  s_houseIdx = 0;
 static uint32_t s_offlineSince = 0;
 
 // 与 persona/houses.yaml 同序：courage / ambition / wisdom / loyalty
-static const uint8_t* HOUSE_PHRASE[4]  = { PH_GRYFFINDOR, PH_SLYTHERIN, PH_RAVENCLAW, PH_HUFFLEPUFF };
-static const size_t   HOUSE_SIZE[4]    = { sizeof(PH_GRYFFINDOR), sizeof(PH_SLYTHERIN),
-                                           sizeof(PH_RAVENCLAW), sizeof(PH_HUFFLEPUFF) };
+// 与 hat_comm.cpp 的 speak_house 用同一套宏，跟着 HAT_HOUSE_ORIGINAL 切换
+#if HAT_HOUSE_ORIGINAL
+static const uint8_t* HOUSE_PHRASE[4]  = { PH_HOUSE_COURAGE_ORIG, PH_HOUSE_AMBITION_ORIG,
+                                           PH_HOUSE_WISDOM_ORIG,  PH_HOUSE_LOYALTY_ORIG };
+static const size_t   HOUSE_SIZE[4]    = { sizeof(PH_HOUSE_COURAGE_ORIG), sizeof(PH_HOUSE_AMBITION_ORIG),
+                                           sizeof(PH_HOUSE_WISDOM_ORIG),  sizeof(PH_HOUSE_LOYALTY_ORIG) };
+#else
+static const uint8_t* HOUSE_PHRASE[4]  = { PH_HOUSE_COURAGE, PH_HOUSE_AMBITION,
+                                           PH_HOUSE_WISDOM,  PH_HOUSE_LOYALTY };
+static const size_t   HOUSE_SIZE[4]    = { sizeof(PH_HOUSE_COURAGE), sizeof(PH_HOUSE_AMBITION),
+                                           sizeof(PH_HOUSE_WISDOM),  sizeof(PH_HOUSE_LOYALTY) };
+#endif
 static const char*    HOUSE_NAME[4]    = { "赤翎", "玄渊", "星枢", "穗垣" };
 
 void offline_begin() {
