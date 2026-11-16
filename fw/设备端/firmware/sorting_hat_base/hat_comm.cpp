@@ -136,6 +136,8 @@ static void on_text(uint8_t* payload, size_t len) {
     Serial.printf("[WS-RX] result house=%s line=\"%s\"\n",
                   house, (const char*)(doc["line"] | ""));
     speak_house(house);                      // 念本地预录句，不念 line（里面有【占位】）
+    // 把 t_arm/t0/t5a/t5b 交给上位机算 TTFC；reason=done 表示"本次结束、连接继续"
+    comm_send_bye("done");
   } else if (strcmp(type, "error") == 0) {
     Serial.printf("[WS-RX] error code=%s degrade=%s fatal=%d\n",
                   (const char*)(doc["code"] | ""),

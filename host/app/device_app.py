@@ -215,7 +215,9 @@ async def voice(ws: WebSocket):
                 elif t == "bye":
                     await cancel(silence_task, watchdog)
                     flush(sid, data.get("dev_ts"))
-                    break
+                    # done = 设备把 dev_ts 交上来，但连接继续复用；其余原因才收尾
+                    if data.get("reason") != "done":
+                        break
 
             elif msg.get("bytes") is not None:
                 b = msg["bytes"]
