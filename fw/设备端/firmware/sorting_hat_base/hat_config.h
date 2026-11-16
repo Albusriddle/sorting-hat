@@ -56,7 +56,7 @@
 #define OPUS_COMPLEXITY   5       // 0–10，S3 上 5 大约占 30–50% CPU；C3 要降到 1
 
 // ---------------- 时间参数 ----------------
-#define LISTEN_TIMEOUT_MS   25000UL  // 进 LISTENING 后多久没说完算超时
+#define LISTEN_TIMEOUT_MS   30000UL  // 进 LISTENING 后多久没说完算超时
                                      // 搭配上位机 SILENCE_MS=15000 / SILENCE_BYE_MS=20000 使用：
                                      // 15s 才发救场句（避免帽子插嘴盖住观众），20s 上位机先 bye，
                                      // 本值留到 25s 兜底，正常不会触发

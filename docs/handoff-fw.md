@@ -79,3 +79,19 @@ host 侧对应检查：`/stats` 有 `last.text`；`/v1/sessions` 有 `ttfc_ms`�
 | 3 | 会话结束后静音计时还在跑 | 计时按"轮"：`vad` 即取消，失败不重挂，`bye` 取消 | 无；不会再收到莫名的 `bye{silence}` |
 
 **验收**：`w`→`A`→`e`（全零 PCM）应出 `result`；静音 6.5 s 的救场句能完整念完；失败一轮后等 20 s 不应收到 `bye`。
+
+
+---
+
+## 8. 2026-11-17 交接说明修复（host + 固件）
+
+| 问题 | 修法 | 端 |
+|---|---|---|
+| 静音救场吞话 | `SILENCE_MS` 默认 **8000**、`SILENCE_BYE_MS` **20000**；识别到词条时设备补发 `vad{speech_start}`，host 收到即**取消**计时 | host + 固件 |
+| 超时断线重连 | host 收到任何 `bye` 都只结算本轮、**不断连**；断开只由 socket 关闭决定 | host |
+| TTFC 负数/回绕 | 设备 `t0` 改到 `comm_send_vad_end()` **之前**打点；host 只接受 `0 ≤ 差值 ≤ 120 s`，否则记 `clock_skew` 并置 `None`；设备打印改有符号 | host + 固件 |
+| 两个静音参数撞车 | 启动校验 `SILENCE_BYE_MS >= SILENCE_MS + 5000`，不满足拒绝启动 | host |
+| 设备 25 s 超时 vs host 20 s | 设备改 **30000 ms**，晚于 host 收尾 | 固件 |
+| "声音是 host PCM"误解 | 实际是 `tts{start}` 的 `text` 由 CSK4002 念；`0x02` 帧在无功放时被忽略 | 文档 |
+
+**设备需重烧**：`t0` 顺序、`vad_start`、`LISTEN_TIMEOUT_MS=30000`、`hat_ts_dump` 有符号打印。

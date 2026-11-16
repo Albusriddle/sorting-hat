@@ -168,7 +168,7 @@ tools/               仓库自检、发布脚本
 | `ASR_PROVIDER` / `LLM_PROVIDER` / `TTS_PROVIDER` | `mock` | 改 `aws` 走云端 |
 | `MIN_AUDIO_RMS` | `50` | 低于此值视为静音，不判院 |
 | `HISTORY_WINDOW` / `MIN_HISTORY_FOR_BALANCE` | `10` / `10` | 反集中/配额只在攒够历史后启用 |
-| `SILENCE_MS` / `SILENCE_BYE_MS` | `6500` / `15000` | 救场 / 收尾 |
+| `SILENCE_MS` / `SILENCE_BYE_MS` | `8000` / `20000` | 救场 / 收尾（bye 必须 ≥ silence+5 s，否则拒绝启动） |
 | `REQUIRE_TLS` / `TLS_CERT` / `TLS_KEY` | `0` / 空 | 开 TLS 时缺证书拒绝启动 |
 
 完整键见 [`host/.env.example`](host/.env.example)。

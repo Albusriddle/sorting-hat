@@ -120,3 +120,19 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 2. 删除 ±121 底噪绕过；
 3. 复测：`w → A → e` 出 `result`；静音 6.5 s 救场句完整；失败一轮后 20 s 无 `bye`；
 4. 若使用副本 `D:\学习区\分院帽\sorting-hat-main`，`git pull` 到 `e29f38c` 再测。
+
+---
+
+# 附：第二轮（2026-11-17 交接说明）修复
+
+| # | 问题 | 方案 | 端 | 验证 |
+|---|---|---|---|---|
+| 1 | 静音救场吞话 | `SILENCE_MS` 8000 / `SILENCE_BYE_MS` 20000；识别到词条时发 `vad{speech_start}`，host 收到即取消计时 | host + 固件 | 单测 + 代码审查 |
+| 2 | 超时断线重连 | `bye` 任何 reason 都只结算、不断连 | host | `test_bye_silence_keeps_connection` |
+| 3 | TTFC 负数/回绕 | 设备 `t0` 提前打点；host 只接受 `0≤差值≤120s`，否则 `None` + `clock_skew`；设备改有符号打印 | host + 固件 | `test_ttfc_is_none_when_device_clock_backwards` |
+| 4 | 两个静音参数撞车 | 启动校验 `bye ≥ silence+5000`，不满足退出码 2 | host | `test_config.py` 3 条 |
+| 5 | 设备 25s vs host 20s | 设备改 30000 ms | 固件 | 代码审查 |
+| 6 | "声音来自 host PCM"误解 | 文档改为"CSK4002 念 `tts.text`；0x02 在无功放时忽略" | 文档 | — |
+
+回归：**42 passed**；冒烟（全零 PCM + text）`house=loyalty`；启动校验输出
+`invalid settings: SILENCE_BYE_MS(15000) must be >= SILENCE_MS(15000) + 5000`。

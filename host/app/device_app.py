@@ -96,8 +96,15 @@ async def voice(ws: WebSocket):
             t5a = dev_ts.get("t5a", t0)
             t5b = dev_ts.get("t5b", t0)
             if t0 and t5b:
-                row["ttfc_ms"] = int(t5b) - int(t0)
-                row["ttfv_ms"] = int(t5a or t0) - int(t0)
+                d = int(t5b) - int(t0)
+                dv = int(t5a or t0) - int(t0)
+                # 设备打点可能早于 t0（t5b < t0），不要让负数/回绕进库
+                if 0 <= d <= settings.session_max_ms:
+                    row["ttfc_ms"] = d
+                else:
+                    row["ttfc_ms"] = None
+                    row["clock_skew"] = d
+                row["ttfv_ms"] = dv if 0 <= dv <= settings.session_max_ms else None
             row["dev_ts"] = dev_ts
         record(row)
 
@@ -186,6 +193,7 @@ async def voice(ws: WebSocket):
 
                 elif t == "vad" and data.get("ev") == "speech_start":
                     last_speech = time.monotonic()
+                    await cancel(silence_task)     # "听到了" → 停表
 
                 elif t == "vad" and data.get("ev") == "speech_end":
                     last_speech = time.monotonic()
@@ -222,9 +230,9 @@ async def voice(ws: WebSocket):
                 elif t == "bye":
                     await cancel(silence_task, watchdog)
                     flush(sid, data.get("dev_ts"))
-                    # done = 设备把 dev_ts 交上来，但连接继续复用；其余原因才收尾
-                    if data.get("reason") != "done":
-                        break
+                    # 连接复用：任何 reason 都只结算本轮，不主动断开；
+                    # 真正断开只由 WebSocket 关闭决定（避免 2 秒重连空档）。
+                    continue
 
             elif msg.get("bytes") is not None:
                 b = msg["bytes"]

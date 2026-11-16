@@ -89,13 +89,14 @@ static void poll_asr() {
   // 观众说的内容：只在 LISTENING 状态下才理，避免 ARMED 待机时误触发
   if (hat_state_get() == HatState::LISTENING) {
     hat_intent_on_word_id(id);
+    comm_send_vad_start();                   // "听到了" → 上位机停静音计时
 
     for (int i = 0; i < 5; ++i) {            // 补 100ms 音频帧，保持与 e 键一致的节奏
       mic_pump_frame();
       delay(20);
     }
-    comm_send_vad_end();
     hat_ts_stamp(&HatTs::t0);
+    comm_send_vad_end();
     go(HatState::THINKING, "VAD_END");
   } else {
     Serial.printf("[ASR] 编号 %u（非唤醒词，当前不在听，忽略）\n", id);
@@ -115,8 +116,8 @@ static void handle_serial() {
           mic_pump_frame();
           delay(20);
         }
-        comm_send_vad_end();
         hat_ts_stamp(&HatTs::t0);
+        comm_send_vad_end();
         go(HatState::THINKING, "VAD_END");
       }
       break;
@@ -286,8 +287,8 @@ void loop() {
     mic_loop(&started, &ended);
     if (started) comm_send_vad_start();
     if (ended && hat_state_get() == HatState::LISTENING) {
-      comm_send_vad_end();
       hat_ts_stamp(&HatTs::t0);
+      comm_send_vad_end();
       go(HatState::THINKING, "VAD_END");
     }
   }

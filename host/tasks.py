@@ -1,10 +1,11 @@
 """Windows-friendly task runner: python tasks.py test|up|preheat|ready|smoke|replay"""
 import json
+import os
 import subprocess
 import sys
 import urllib.request
 
-TOKEN = "dev-token"
+TOKEN = os.getenv("ADMIN_TOKEN", "dev-token")
 BASE = "http://127.0.0.1:8080"
 
 

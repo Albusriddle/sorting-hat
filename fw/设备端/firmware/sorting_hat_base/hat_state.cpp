@@ -50,6 +50,15 @@ void hat_ts_dump() {
                 (unsigned long)g_ts.tArm, (unsigned long)g_ts.t0,
                 (unsigned long)g_ts.t5a, (unsigned long)g_ts.t5b,
                 (unsigned long)g_ts.tStop);
-  if (g_ts.t5a && t0) Serial.printf("[TS] TTFV=%lu ms\n", (unsigned long)(g_ts.t5a - t0));
-  if (g_ts.t5b && t0) Serial.printf("[TS] TTFC=%lu ms\n", (unsigned long)(g_ts.t5b - t0));
+  // 设备打点可能早于 t0（WS 发送与下行竞争），无符号相减会变成 2^32-差值
+  if (g_ts.t5a && t0) {
+    int32_t d = (int32_t)(g_ts.t5a - t0);
+    if (d >= 0) Serial.printf("[TS] TTFV=%ld ms\n", (long)d);
+    else        Serial.printf("[TS] TTFV=n/a (t5a<t0 by %ld ms)\n", (long)(-d));
+  }
+  if (g_ts.t5b && t0) {
+    int32_t d = (int32_t)(g_ts.t5b - t0);
+    if (d >= 0) Serial.printf("[TS] TTFC=%ld ms\n", (long)d);
+    else        Serial.printf("[TS] TTFC=n/a (t5b<t0 by %ld ms)\n", (long)(-d));
+  }
 }

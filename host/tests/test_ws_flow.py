@@ -150,3 +150,30 @@ def test_noise_without_text_does_not_judge():
             if d["type"] == "tts" and d.get("state") == "stop":
                 return
         raise AssertionError(f"no tts stop, saw {kinds}")
+
+
+def test_bye_silence_keeps_connection():
+    """bye{silence} 只结算本轮，不断连接（联调问题 2）。"""
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        r1 = _run_one(ws, "我最怕输，但我更怕自己在关键时候退缩。")
+        assert r1["house"] == "courage"
+        ws.send_json({"type": "bye", "reason": "silence"})
+        r2 = _run_one(ws, "我在乎身边的人，他们需要我的时候我不会缺席。")
+        assert r2["house"] == "loyalty"
+
+
+def test_ttfc_is_none_when_device_clock_backwards():
+    """设备 t5b < t0 时不把负数/回绕写进库（联调问题 1）。"""
+    from app.metrics import tail
+    import time as _t
+
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        _run_one(ws, "我喜欢把一件事拆开想清楚，再决定要不要做。")
+        ws.send_json({"type": "bye", "reason": "done",
+                      "dev_ts": {"t_arm": 1, "t0": 100, "t5a": 90, "t5b": 80}})
+    _t.sleep(0.2)
+    row = tail(1)[0]
+    assert row["ttfc_ms"] is None
+    assert row["clock_skew"] == -20

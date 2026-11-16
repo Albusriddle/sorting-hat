@@ -27,8 +27,8 @@ class Settings:
 
     # session
     session_max_ms: int = int(_env("SESSION_MAX_MS", "120000"))
-    silence_ms: int = int(_env("SILENCE_MS", "6500"))
-    silence_bye_ms: int = int(_env("SILENCE_BYE_MS", "15000"))
+    silence_ms: int = int(_env("SILENCE_MS", "8000"))
+    silence_bye_ms: int = int(_env("SILENCE_BYE_MS", "20000"))
     budget_ms: int = int(_env("BUDGET_MS", "1240"))
     text_max_chars: int = int(_env("TEXT_MAX_CHARS", "200"))
     tts_bridge_max_chars: int = int(_env("TTS_BRIDGE_MAX_CHARS", "40"))
@@ -56,3 +56,13 @@ class Settings:
 
 
 settings = Settings()
+
+
+def validate_settings(s: Settings | None = None) -> None:
+    """Fail fast on the silence/bye pair (联调踩过的坑)."""
+    s = s or settings
+    if s.silence_ms <= 0:
+        raise ValueError("SILENCE_MS must be > 0")
+    if s.silence_bye_ms < s.silence_ms + 5000:
+        raise ValueError(
+            f"SILENCE_BYE_MS({s.silence_bye_ms}) must be >= SILENCE_MS({s.silence_ms}) + 5000")

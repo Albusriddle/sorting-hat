@@ -6,7 +6,7 @@ import sys
 import uvicorn
 
 from .admin_app import admin_app
-from .config import settings
+from .config import settings, validate_settings
 from .device_app import device_app
 
 
@@ -20,6 +20,11 @@ def _ssl_kwargs() -> dict:
 
 
 async def main() -> None:
+    try:
+        validate_settings()
+    except ValueError as exc:
+        print(f"invalid settings: {exc}", file=sys.stderr)
+        raise SystemExit(2)
     ssl = _ssl_kwargs()
     dev = uvicorn.Server(uvicorn.Config(device_app, host=settings.host, port=settings.port,
                                         log_level="info", **ssl))
