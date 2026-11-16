@@ -1,0 +1,14 @@
+# 统一按 LF 存储：避免 Windows 端 CRLF 造成的整文件 "改写"
+* text=auto eol=lf
+
+# 二进制/大文件不参与换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.wav binary
+*.mp3 binary
+*.opus binary

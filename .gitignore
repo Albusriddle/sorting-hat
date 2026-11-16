@@ -14,6 +14,8 @@ host/var/
 .env.local
 *.pem
 *.key
+secrets.h
+!secrets.h.example
 
 # os
 .DS_Store

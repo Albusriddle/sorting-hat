@@ -1,27 +1,3 @@
-// ============================================================
-// sorting_hat_base.ino —— 只放 setup() / loop()
-//
-// Arduino 官方构建流程：.ino 会被 IDE 在前面自动插入函数原型，
-// 原型出现在任何类型定义之前。函数参数用到自定义类型就会报 "not declared"。
-// 所以除了 setup/loop 之外，所有逻辑都放进了 .h / .cpp。
-//
-// 文件清单：
-//   hat_config.h     引脚、音频参数、时间、VAD 阈值、编译开关
-//   hat_state.*      6 态状态机
-//   hat_hw.*         硬件抽象（麦克风/喇叭/灯/按钮，各有编译开关）
-//   hat_comm.*       Wi-Fi + WebSocket + 协议 + Opus 收发
-//   hat_opus.*       Opus 编解码（HAT_ENABLE_OPUS）
-//   hat_mic.*        采音节奏 + 能量 VAD（HAT_ENABLE_VAD）
-//   hat_offline.*    断网兜底 + 离线按钮模式
-//   secrets.h        Wi-Fi 账号、上位机 IP（不要提交）
-//   asr_wonderecho.* 组长驱动
-//   tts_xfs5152.*    组长驱动
-//   phrases_gbk.h    组长台词表
-//
-// 串口命令（代替真硬件）：
-//   w 唤醒   e 说完了   b 打断   x 故障   o 手动进离线
-//   a 试听开场白   1-4 试听四院   k 打印 VAD 能量
-// ============================================================
 #include <Wire.h>
 #include "hat_config.h"
 #include "hat_state.h"
@@ -90,14 +66,17 @@ static void start_listening(const char* ev) {
   go(HatState::LISTENING, ev);
 }
 
-// ---------------- 语音识别（LD3320A）轮询 ----------------
-// 模块每识别到一个词条就回一个编号。这里区分两种情况：
-//   编号 == 唤醒词 → 进入 ARMED 并开始收音
-//   其他编号     → 当成"观众说了这句话"，转成文字发给云端
 static void poll_asr() {
   if (!asr.online()) return;
   uint8_t id = asr.poll(millis());
   if (id == 0) return;
+
+  // 合法编号只有 1..5。开机瞬间 I2C 偶发读到垃圾值（实测出现过 242），
+  // 不在这里挡掉，会被当成"说了个不存在的词条"往下走。
+  if (id > 5) {
+    Serial.printf("[ASR] 读到非法编号 %u，忽略\n", id);
+    return;
+  }
 
   if (id == ASR_WAKE_WORD_ID) {
     Serial.println("[ASR] 唤醒词");
@@ -110,6 +89,14 @@ static void poll_asr() {
   // 观众说的内容：只在 LISTENING 状态下才理，避免 ARMED 待机时误触发
   if (hat_state_get() == HatState::LISTENING) {
     hat_intent_on_word_id(id);
+
+    for (int i = 0; i < 5; ++i) {            // 补 100ms 音频帧，保持与 e 键一致的节奏
+      mic_pump_frame();
+      delay(20);
+    }
+    comm_send_vad_end();
+    hat_ts_stamp(&HatTs::t0);
+    go(HatState::THINKING, "VAD_END");
   } else {
     Serial.printf("[ASR] 编号 %u（非唤醒词，当前不在听，忽略）\n", id);
   }
@@ -193,8 +180,28 @@ static void handle_serial() {
 
     case 'p': hat_intent_dump(); break;        // 打印词条表
 
-    // 大写 A/B/C/D = 手动模拟"模块识别到第 1/2/3/4 号词条"，
-    // 不用真模块也能把"词条 → 文字 → 云端"这条路验通
+    case 'P': {
+      Serial.println("[ASR] 开始写入词条…");
+      if (!asr.eraseWords()) { Serial.println("[ASR] 擦除失败"); break; }
+      struct { uint8_t id; const char* py; } words[] = {
+        {5, "kai shi"},                      // ← 第一条；先用官方例程验证过的词排除拼音因素
+        {1, "wo pa shu"},
+        {2, "wo yao de hen da"},
+        {3, "wo xi huan chai kai xiang"},
+        {4, "wo zai hu shen bian"},
+      };
+      bool allOk = true;
+      for (auto& w : words) {
+        if (asr.addWords(w.id, w.py)) Serial.printf("[ASR] +%u %s\n", w.id, w.py);
+        else { Serial.printf("[ASR] 写入失败 id=%u\n", w.id); allOk = false; }
+      }
+
+      if (allOk && asr.setMode(1)) Serial.println("[ASR] 词条写入完成，模式=1(循环)，第一条=唤醒词");
+      else Serial.println("[ASR] 写入未全部成功，请重试");
+      break;
+    }
+
+
     case 'A': hat_intent_on_word_id(1); break;
     case 'B': hat_intent_on_word_id(2); break;
     case 'C': hat_intent_on_word_id(3); break;
