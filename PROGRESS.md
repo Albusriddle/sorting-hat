@@ -1,4 +1,4 @@
-# 进度（截至 2026-11-16 11:40）
+# 进度（截至 2026-11-17 02:40）
 
 ## 已完成（本机可复现）
 
@@ -8,11 +8,11 @@
 | 2 | 上位机网关/编排/判决/管理面/大屏 | `python tasks.py up`；`/healthz`、`/stats` |
 | 3 | 六步预热（preroll 可选） | `python tasks.py preheat` → `ok:true`，`degraded=[preroll_placeholder]` |
 | 4 | 端到端冒烟（无设备） | `python tasks.py smoke` → `house=loyalty`、`scores`、`announce` |
-| 5 | 单测 | `python tasks.py test` → **43 passed** |
+| 5 | 单测 | `python tasks.py test` → **44 passed** |
 | 6 | 设备端固件（Arduino） | `fw/设备端/firmware/sorting_hat_base/`（A 上传） |
 | 7 | 学院名双套 + 编译开关 | `gen_phrases.py` 生成；`HAT_HOUSE_ORIGINAL` 切换 |
 | 8 | 词条映射 → text 通路 | 设备 `hat_intent`；host `text` 分支；冒烟验证 |
-| 9 | 零音频闸 / 鉴权等值 / halt / watchdog / 落库 | S-01…S-17 修复记录见 `sortinghat/问题清单/上位机问题清单.md` §8 |
+| 9 | 零音频闸 / 鉴权等值 / halt / watchdog / 落库 | 两轮修复见 `docs/fix-report-2026-11-16.md` |
 
 ## 待办（需要硬件/凭证）
 
@@ -25,8 +25,9 @@
 ## 命令
 
 ```bash
-cd host && cp .env.example .env      # 改 DEVICE_TOKEN / ADMIN_TOKEN
-python tasks.py test                 # 43 passed
+cd host
+export DEVICE_TOKEN=dev-token ADMIN_TOKEN=dev-token   # .env 不自动加载
+python tasks.py test                 # 44 passed
 python tasks.py up                   # device :8443 / admin :8080
 python tasks.py preheat
 python tasks.py ready                # 200

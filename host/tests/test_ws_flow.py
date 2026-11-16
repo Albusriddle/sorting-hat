@@ -202,3 +202,28 @@ def test_aborted_session_is_recorded():
     assert len(rows) >= before + 1
     assert rows[-1]["outcome"] == "aborted"
     assert rows[-1]["reason"] == "no_text_mock"
+
+
+def test_abort_records_row():
+    """按钮打断也要落一行（outcome=aborted, reason=doff）。"""
+    from app.metrics import tail
+    import time as _t
+
+    before = len(tail(200))
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        ws.send_json({"type": "listen", "state": "start"})
+        ws.send_json({"type": "text", "text": "我在乎身边的人。"})
+        ws.send_json({"type": "abort", "reason": "button"})
+        for _ in range(20):
+            m = ws.receive()
+            if "bytes" in m:
+                continue
+            d = json.loads(m["text"])
+            if d.get("type") == "bye":
+                break
+    _t.sleep(0.2)
+    rows = tail(200)
+    assert len(rows) >= before + 1
+    assert rows[-1]["outcome"] == "aborted"
+    assert rows[-1]["reason"] == "doff"

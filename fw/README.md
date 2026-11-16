@@ -40,6 +40,7 @@ Arduino IDE 2.x + esp32 板子包，板型选 **ESP32 Dev Module**，波特率 1
 - 上行：`listen start`、`vad start/end`、`0x04`（PCM 20 ms/320 样本）、`0x01`（Opus，可选）、`text`（词条文本）、`abort`、`bye{dev_ts}`。
 - 下行：`ready{sid,audio,budget_ms}`、`tts{start/stop,text}`、`0x02`（PCM 60 ms/1920 B）、`result{house,reasons,line,scores,announce}`、`error`、`bye`。
 - 时间戳：`t_arm/t0/t5a/t5b/t_stop`，通过 `bye.dev_ts` 回传。
+- 最新行为（`t0` 提前、`vad_start`、30 s 超时、`tts{stop}` 不硬停）见 §7。
 
 ## 5. 串口命令
 

@@ -8,11 +8,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from . import protocol
 from .audio import SessionAudio
-from .config import settings
+from .config import settings, validate_settings
 from .engine import SessionEngine, ms
 from .metrics import record
 from .providers import build_providers
 from .state import STATE
+
+validate_settings()
 
 device_app = FastAPI(title="sortinghat-device")
 
@@ -63,7 +65,13 @@ async def voice(ws: WebSocket):
         else:
             await ws.send_json(m)
 
+    tts_lock = asyncio.Lock()
+
     async def send_tts_line(text: str) -> None:
+        async with tts_lock:
+            await _send_tts_line(text)
+
+    async def _send_tts_line(text: str) -> None:
         await emit(protocol.tts("start", 1, text))
         try:
             frames = await asyncio.wait_for(TTS.synth_async(text),
@@ -85,9 +93,9 @@ async def voice(ws: WebSocket):
     rescued = False
     heard = asyncio.Event()
 
-    def record_aborted(reason: str) -> None:
+    def record_aborted(reason: str, text: str = "") -> None:
         record({"sid": sid, "outcome": "aborted", "reason": reason,
-                "text": last_text, "degrade": [reason],
+                "text": text or last_text, "degrade": [reason],
                 "audio": STATE.session_audio.get(sid, {})})
 
     def flush(session_id: str, dev_ts: dict | None = None) -> None:
@@ -121,6 +129,8 @@ async def voice(ws: WebSocket):
     def _collect(fut) -> None:
         try:
             out = fut.result()
+        except asyncio.CancelledError:
+            return
         except Exception:
             return
         # watchdog 只管"这一轮听", 结果出来就停
@@ -129,7 +139,7 @@ async def voice(ws: WebSocket):
         if not out:
             return
         if out.get("aborted"):
-            record_aborted(str(out.get("aborted")))
+            record_aborted(str(out.get("aborted")), out.get("text", ""))
             return
         if not out.get("verdict"):
             return
@@ -168,6 +178,9 @@ async def voice(ws: WebSocket):
 
     async def session_watchdog():
         await asyncio.sleep(settings.session_max_ms / 1000)
+        if task and not task.done():
+            task.cancel()                       # 先停引擎，避免关闭后还写 socket
+        record_aborted("timeout")
         try:
             await ws.send_json(protocol.bye("timeout"))
             await ws.close()
@@ -204,7 +217,8 @@ async def voice(ws: WebSocket):
                         continue
                     last_text = ""
                     audio.reset()
-                    await cancel(silence_task, watchdog)
+                    async with tts_lock:            # 等上一句发完，避免旧救场句串到新会话
+                        await cancel(silence_task, watchdog)
                     silence_task = start_silence()
                     watchdog = asyncio.create_task(session_watchdog())
 
@@ -226,11 +240,11 @@ async def voice(ws: WebSocket):
                         pass                                # 有文字就用文字，完全不看音频
                     elif settings.asr_provider == "mock":
                         # mock ASR 不看 pcm，不能凭"底噪"凭空判院
-                        record_aborted("no_text_mock")
+                        record_aborted("no_text_mock", last_text)
                         await send_tts_line("唔……我没听清，再说一次？")
                         continue
                     elif not pcm or stats["rms"] < settings.min_audio_rms:
-                        record_aborted("silent_audio")
+                        record_aborted("silent_audio", last_text)
                         await send_tts_line("唔……我没听清，再说一次？")
                         continue
                     task = asyncio.create_task(ENGINE.run(emit, last_text, t0=t0, t1=ms(),
@@ -241,6 +255,7 @@ async def voice(ws: WebSocket):
                     await cancel(task, silence_task, watchdog)
                     audio.reset()
                     flush(sid)
+                    record_aborted("doff", last_text)
                     await ws.send_json(protocol.bye("doff"))
 
                 elif t == "ping":

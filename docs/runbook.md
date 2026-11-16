@@ -1,8 +1,8 @@
 # 上台手册（Windows / macOS 通用）
 
-1. `cd host && cp .env.example .env`，改 `DEVICE_TOKEN` / `ADMIN_TOKEN`；设备 `secrets.h` 的 `TOKEN` 与之一致。
+1. `cd host`，`export DEVICE_TOKEN=… ADMIN_TOKEN=…`（`.env` 不会自动加载；键名见 `.env.example`）；设备 `secrets.h` 的 `TOKEN` 与 `DEVICE_TOKEN` 一致。
 2. `pip install -r requirements.txt`（可选 `-r requirements-audio.txt`）。
-3. `python tasks.py test` → 34 passed。
+3. `python tasks.py test` → 44 passed。
 4. `python tasks.py up`（device :8443 / admin :8080）。
 5. `python tasks.py preheat` → `ok:true`；若 `degraded:["preroll_placeholder"]` 可上台（宣布句走设备 TTS）。
 6. `python tasks.py ready` → 200。

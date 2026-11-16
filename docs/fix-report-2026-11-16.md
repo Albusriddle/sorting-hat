@@ -2,7 +2,7 @@
 
 > 对应输入：`烧板联调问题-11-17.md`（设备端联调记录）
 > 对应提交：**`e29f38c`**（`42e50f5..e29f38c`，已推 `origin/main`）
-> 回归：第一轮 37 passed；两轮累计 **43 passed**（见文末第二轮）；冒烟（全零 PCM + text）`house=loyalty`；8 秒计时观察 PASS
+> 回归：第一轮 37 passed；两轮累计 43，当前 **44**（见文末第二轮）；冒烟（全零 PCM + text）`house=loyalty`；8 秒计时观察 PASS
 
 ## 0. 结论
 
@@ -134,5 +134,21 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 | 5 | 设备 25s vs host 20s | 设备改 30000 ms | 固件 | 代码审查 |
 | 6 | "声音来自 host PCM"误解 | 文档改为"CSK4002 念 `tts.text`；0x02 在无功放时忽略" | 文档 | — |
 
-回归：**43 passed**；冒烟（全零 PCM + text）`house=loyalty`；启动校验输出
+回归：**43 passed**（第三轮后 44）；冒烟（全零 PCM + text）`house=loyalty`；启动校验输出
 `invalid settings: SILENCE_BYE_MS(15000) must be >= SILENCE_MS(15000) + 5000`。
+
+
+---
+
+# 附：第三轮（2026-11-17 全仓审阅）修复
+
+| # | 问题 | 方案 | 验证 |
+|---|---|---|---|
+| 1 | 静音救场与新 listen 竞态 | `tts_lock` 串行化发送；新 `listen` 等上一句发完 | 代码审查 |
+| 2 | abort 不落库 | `abort` 写 `outcome=aborted, reason=doff` | `test_abort_records_row` |
+| 3 | 校验只在 run.py | `device_app` 导入时 `validate_settings()` | 任意入口生效 |
+| 4 | watchdog 关闭时引擎仍写 socket | 先 `task.cancel()` 再关闭，并记 `timeout` | 代码审查 |
+| 5 | aborted 行缺文本 | `record_aborted(reason, text)` | 代码审查 |
+| 6 | providers/runbook 34、runbook/PROGRESS 的 `.env` | 改 44、改 export | 文档抽查 |
+
+回归：**44 passed**。

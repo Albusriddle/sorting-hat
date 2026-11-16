@@ -78,7 +78,7 @@ pip install -r requirements-audio.txt   # 可选：Opus 解码；没有就走 0x
 export DEVICE_TOKEN=dev-token
 export ADMIN_TOKEN=dev-token
 
-python tasks.py test        # 43 passed
+python tasks.py test        # 44 passed
 python tasks.py up          # device :8443 / admin :8080（admin 只绑 127.0.0.1）
 ```
 
@@ -186,7 +186,7 @@ tools/               仓库自检、发布脚本
 ## 9. 测试与验收
 
 ```bash
-python -m pytest -q            # 43 passed
+python -m pytest -q            # 44 passed
 python tools/check_tree.py     # missing: none / extra: none
 python tasks.py preheat        # ok:true
 python tasks.py smoke          # result + scores + announce

@@ -40,7 +40,7 @@
 - 全零/低能量音频（RMS < `MIN_AUDIO_RMS`）不判院，只回"没听清"。
 - **VAD 归属**：由设备判定（能量阈值 + 300 ms 尾点），host 只响应 `vad{speech_end}`，**不自己跑 VAD**。
 - `bye{reason:...}` 表示本次会话结束，**host 不主动断开**（任何 reason 都只结算本轮）；真正断开由 WebSocket 关闭决定。
-- `vad{speech_start}` 是"我听到了"：host 收到后**取消**静音计时（不只是重置）。
+- `vad{speech_start}` 是"我听到了"：host 收到后**停止**静音计时（置事件让 monitor 退出，不打断正在发的句子）。
 - `halt_new/stop_all` 只拦新的 `listen`，**不打断在途会话**（现场刹车的第一道，不是强杀）。
 - `ttfc/ttfv` 只写入 `0 ≤ 差值 ≤ SESSION_MAX_MS` 的值；设备打点早于 `t0` 时记 `clock_skew` 并置 `None`。
 - **一次会话的固定顺序**：`listen{start}` → `text`（可选）→ `vad{speech_end}` → `tts{start}`（桥接句）→ `0x02` 帧（默认 60 ms/帧节拍）→ `tts{stop}` → `result` → 设备 `bye{done,dev_ts}`。
