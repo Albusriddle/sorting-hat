@@ -39,14 +39,14 @@ class MockASR(Provider):
 
 
 class MockLLM(Provider):
-    """Deterministic 'personality' scorer: keyword counts -> evidence + scores."""
+    """Deterministic scorer used for the demo. Never invents a house."""
     name = "mock-llm"
 
     KEYS = {
-        "courage": ("赢", "冲", "敢", "不服", "硬", "拼"),
-        "ambition": ("想要", "目标", "第一", "认可", "升", "拿"),
-        "wisdom": ("想", "为什么", "琢磨", "书", "研究", "拆"),
-        "loyalty": ("朋友", "家", "一起", "守", "陪", "队"),
+        "courage":  ("怕输", "退缩", "不敢", "硬着头皮", "豁出去"),
+        "ambition": ("想要", "目标", "第一", "认可", "拿到手", "升"),
+        "wisdom":   ("拆开", "想清楚", "琢磨", "研究", "为什么", "书"),
+        "loyalty":  ("身边", "在乎", "需要我", "缺席", "朋友", "家人", "护着"),
     }
     LINES = {
         "courage": "有意思。你不怕撞墙，那就去撞出个名堂吧。",
@@ -66,7 +66,7 @@ class MockLLM(Provider):
         scores, evidence, used = {}, [], set()
         for dim, keys in self.KEYS.items():
             hits = [k for k in keys if k in text]
-            scores[dim] = 3 + 2 * len(hits)
+            scores[dim] = float(3 + 2 * len(hits))
             if not hits:
                 continue
             quote = next((c for c in clauses if hits[0] in c and c not in used),
@@ -76,8 +76,8 @@ class MockLLM(Provider):
             if len(evidence) == 3:
                 break
         if not evidence:
-            evidence = [{"quote": clauses[0][:12], "trait": "courage", "why": "语速与停顿"}]
-            scores["courage"] += 1
+            # 不伪造证据：四维全不命中就明确返回 insufficient，让引擎去追问
+            return {"evidence": [], "scores": scores, "line": "", "insufficient": True}
         best = max(scores, key=scores.get)
         return {"evidence": evidence, "scores": scores, "line": self.LINES[best]}
 

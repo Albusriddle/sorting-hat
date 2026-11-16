@@ -4,6 +4,9 @@ from __future__ import annotations
 from collections import Counter
 from typing import Iterable
 
+from .config import settings
+from .persona import display_name
+
 DIMENSIONS = ("courage", "ambition", "wisdom", "loyalty")
 
 
@@ -25,7 +28,6 @@ def lev(a: str, b: str) -> int:
 
 
 def quote_present(quote: str, text: str, k: int = 2) -> bool:
-    """True if quote can be found in text with <= k edits (sliding window)."""
     if not quote:
         return False
     if quote in text:
@@ -33,13 +35,9 @@ def quote_present(quote: str, text: str, k: int = 2) -> bool:
     n = len(quote)
     if n > len(text):
         return lev(quote, text) <= k
-    best = 10**9
     for i in range(0, len(text) - n + 1):
-        d = lev(quote, text[i:i + n])
-        if d < best:
-            best = d
-            if best <= k:
-                return True
+        if lev(quote, text[i:i + n]) <= k:
+            return True
     return False
 
 
@@ -53,32 +51,48 @@ def validate_evidence(evidence: Iterable[dict], text: str, k: int = 2) -> tuple[
 
 
 def decide(text: str, payload: dict, recent: list[str], *,
-           penalty: float = 0.85, max_share: float | None = None) -> dict:
+           penalty: float | None = None,
+           max_share: float | None = None,
+           min_history: int | None = None) -> dict:
     """payload = {"evidence":[{quote,trait,why}], "scores":{dim:num}, "line": str}"""
+    penalty = settings.recent3_penalty if penalty is None else penalty
+    max_share = settings.max_share if max_share is None else max_share
+    min_history = settings.min_history_for_balance if min_history is None else min_history
+
+    if payload.get("insufficient"):
+        return {"house": None, "insufficient": True, "reasons": [], "scores": {},
+                "line": "", "quote_ok": False, "quote_failures": ["insufficient"],
+                "degraded": True}
+
     scores = {d: float(payload.get("scores", {}).get(d, 0.0)) for d in DIMENSIONS}
+    if max(scores.values()) <= 0:
+        return {"house": None, "insufficient": True, "reasons": [], "scores": scores,
+                "line": "", "quote_ok": False, "quote_failures": ["all zero"],
+                "degraded": True}
+
     evidence = list(payload.get("evidence", []))
     reasons = [str(e.get("quote", "")).strip() for e in evidence][:3]
     reasons = [r for r in reasons if r] or [text[:12]]
 
-    # anti-cluster: three in a row -> penalise
-    cand = max(scores, key=scores.get)
-    if len(recent) >= 3 and len(set(recent[-3:])) == 1 and recent[-1] == cand:
-        scores[cand] *= penalty
+    # 只有攒够历史才做配平；演示期（<10 次）不做轮转，保证同句同果。
+    if len(recent) >= min_history:
+        cand = max(scores, key=scores.get)
+        if len(set(recent[-3:])) == 1 and recent[-1] == cand:
+            scores[cand] *= penalty
 
-    # share cap: if one house already dominates the last N, force the runner-up
     house = max(scores, key=scores.get)
-    if max_share is not None and recent:
+
+    if len(recent) >= min_history:
         cnt = Counter(recent)
         share = cnt[house] / max(1, len(recent))
         if share > max_share:
-            alt = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
-            for h, _ in alt:
+            for h, _ in sorted(scores.items(), key=lambda kv: kv[1], reverse=True):
                 if h != house:
                     house = h
                     break
 
     ok, bad = validate_evidence(evidence, text)
-    line = str(payload.get("line") or f"那就……去{house}吧。")
+    line = str(payload.get("line") or f"那就……去{display_name(house)}吧。")
     return {
         "house": house,
         "reasons": reasons,
@@ -87,4 +101,5 @@ def decide(text: str, payload: dict, recent: list[str], *,
         "quote_ok": ok,
         "quote_failures": bad,
         "degraded": (not ok),
+        "insufficient": False,
     }

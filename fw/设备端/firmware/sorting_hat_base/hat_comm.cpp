@@ -45,11 +45,33 @@ static int16_t  s_decBuf[2048];
 // ---------------- 学院 → 预录句 ----------------
 static void speak_house(const char* house) {
   const char* cn = "未知";
-  if      (strcmp(house, "courage")  == 0) { tts.speakGBK(PH_GRYFFINDOR, sizeof(PH_GRYFFINDOR)); cn = "赤翎"; }
-  else if (strcmp(house, "ambition") == 0) { tts.speakGBK(PH_SLYTHERIN,  sizeof(PH_SLYTHERIN));  cn = "玄渊"; }
-  else if (strcmp(house, "wisdom")   == 0) { tts.speakGBK(PH_RAVENCLAW,  sizeof(PH_RAVENCLAW));  cn = "星枢"; }
-  else if (strcmp(house, "loyalty")  == 0) { tts.speakGBK(PH_HUFFLEPUFF, sizeof(PH_HUFFLEPUFF)); cn = "穗垣"; }
-  else                                    { tts.speakGBK(PH_RETRY,      sizeof(PH_RETRY));      }
+  if (strcmp(house, "courage") == 0) {
+#if HAT_HOUSE_ORIGINAL
+    tts.speakGBK(PH_HOUSE_COURAGE_ORIG, sizeof(PH_HOUSE_COURAGE_ORIG)); cn = "格兰芬多";
+#else
+    tts.speakGBK(PH_HOUSE_COURAGE, sizeof(PH_HOUSE_COURAGE)); cn = "赤翎";
+#endif
+  } else if (strcmp(house, "ambition") == 0) {
+#if HAT_HOUSE_ORIGINAL
+    tts.speakGBK(PH_HOUSE_AMBITION_ORIG, sizeof(PH_HOUSE_AMBITION_ORIG)); cn = "斯莱特林";
+#else
+    tts.speakGBK(PH_HOUSE_AMBITION, sizeof(PH_HOUSE_AMBITION)); cn = "玄渊";
+#endif
+  } else if (strcmp(house, "wisdom") == 0) {
+#if HAT_HOUSE_ORIGINAL
+    tts.speakGBK(PH_HOUSE_WISDOM_ORIG, sizeof(PH_HOUSE_WISDOM_ORIG)); cn = "拉文克劳";
+#else
+    tts.speakGBK(PH_HOUSE_WISDOM, sizeof(PH_HOUSE_WISDOM)); cn = "星枢";
+#endif
+  } else if (strcmp(house, "loyalty") == 0) {
+#if HAT_HOUSE_ORIGINAL
+    tts.speakGBK(PH_HOUSE_LOYALTY_ORIG, sizeof(PH_HOUSE_LOYALTY_ORIG)); cn = "赫奇帕奇";
+#else
+    tts.speakGBK(PH_HOUSE_LOYALTY, sizeof(PH_HOUSE_LOYALTY)); cn = "穗垣";
+#endif
+  } else {
+    tts.speakGBK(PH_RETRY, sizeof(PH_RETRY));
+  }
   Serial.printf("[TTS] house=%s (%s)\n", house, cn);
 }
 
@@ -92,6 +114,9 @@ static void on_text(uint8_t* payload, size_t len) {
     const char* st = doc["state"] | "";
     Serial.printf("[WS-RX] tts %s text=\"%s\"\n", st, (const char*)(doc["text"] | ""));
     if (strcmp(st, "start") == 0) {
+      // S-07：把 host 的桥接句交给 CSK4002 念（speakUTF8 内部转 UNICODE）
+      const char* txt = doc["text"] | "";
+      if (txt[0]) tts.speakUTF8(txt);
       hat_ts_stamp(&HatTs::t5a);
       hw_speaker_open(s_spkRate);
       hw_mic_enable(false);                  // 半双工：帽子说话时关麦

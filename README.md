@@ -7,7 +7,7 @@
 cd host
 pip install -r requirements.txt
 pip install -r requirements-audio.txt   # 可选：Opus 解码（没有它就走 0x04 PCM 回退）
-python tasks.py test         # 单测（15 passed）
+python tasks.py test         # 单测（31 passed）
 python tasks.py up           # device :8443 / admin :8080
 # 另开一个终端
 python tasks.py preheat      # 六步预热，必须 ok:true

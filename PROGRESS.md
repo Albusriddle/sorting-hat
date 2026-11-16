@@ -8,7 +8,7 @@
 | 2 | 上位机 MVP（WS + 管理面 + 控制台） | `python -m app.run`；`/healthz` 200 |
 | 3 | 六步预热 | `POST /v1/preheat` → `ok:true`，6 步全绿，60 ms |
 | 4 | 端到端冒烟（无设备） | `python tools/smoke_ws.py` → 连接 42 ms、`tts start` 52 ms、`result` 56 ms、20 帧音频 |
-| 5 | 判决（argmax + 反集中 + 引原话） | `pytest` 15 passed |
+| 5 | 判决（argmax + 反集中 + 引原话） | `pytest` 31 passed |
 | 6 | 协议消息与错误码白名单 | `pytest` 覆盖 |
 | 7 | 大屏 `/stats` + 控制台页 | `curl localhost:8080/` |
 | 8 | AWS 三个 adapter（Bedrock / Polly / Transcribe） | `docs/providers.md`；无凭证时 preheat 失败即 fail-closed |

@@ -14,11 +14,17 @@ def test_argmax():
     assert v["house"] == "courage"
 
 
-def test_anti_cluster_penalty():
-    # 8 -> 6.8 with one penalty, still above 6? use 8 vs 7.5 so penalty flips it
+def test_anti_cluster_only_after_history():
+    recent = ["courage", "ambition"] * 5          # len=10, last 3 = ambition,courage,ambition
     v = judge.decide("我不想再解释了", payload(courage=8, ambition=7.6),
-                     ["courage", "courage", "courage"], penalty=0.85)
+                     recent + ["courage", "courage", "courage"], penalty=0.85)
     assert v["house"] == "ambition"
+
+
+def test_no_penalty_under_min_history():
+    v = judge.decide("我不想再解释了", payload(courage=8, ambition=7.6),
+                     ["courage", "courage", "courage"], penalty=0.85, min_history=10)
+    assert v["house"] == "courage"
 
 
 def test_quote_exact_and_fuzzy():
@@ -37,5 +43,10 @@ def test_quote_failure_marks_degraded():
 
 def test_share_cap_forces_runner_up():
     v = judge.decide("对，我不想再解释了。", payload(courage=9, wisdom=8),
-                     ["courage"] * 6, max_share=0.4)
+                     ["courage"] * 10, max_share=0.4, min_history=10)
     assert v["house"] == "wisdom"
+
+
+def test_insufficient_returns_no_house():
+    v = judge.decide("嗯。", {"insufficient": True}, [])
+    assert v["insufficient"] is True and v["house"] is None

@@ -122,7 +122,7 @@ curl -s -X POST localhost:8080/v1/halt -H "X-Admin-Token: dev-token" \
 | 项 | 结果 |
 |---|---|
 | 仓库骨架 | `check_tree.py` → `missing: none / extra: none` |
-| 单测 | **15 passed**（judge 5 / protocol 4 / engine 2 / api 4） |
+| 单测 | **31 passed**（judge / protocol / engine / api / ws flow / aws / opus） |
 | 预热 | `ok:true`，6 步全绿，**60 ms**（persona 2.3 / asr 21.4 / llm 30.2 / tts 2.0 / preroll 4.0 / write 0.5） |
 | 端到端冒烟 | 连接 **42 ms**；`tts start` **52 ms**；`result` **56 ms**；**20 帧音频**；`quote_ok: true` |
 | 一次会话的延迟（mock） | t0→t2 21 ms、t2→t3 30 ms、t3→t4 5 ms，`host_ms=56` |

@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 import uuid
 
+from .config import settings
+
 PROTOCOL = "sortinghat.voice.v1"
 HOUSES = ("courage", "ambition", "wisdom", "loyalty")
 
@@ -21,13 +23,17 @@ def new_sid() -> str:
     return "s-" + uuid.uuid4().hex[:8]
 
 
-def ready(sid: str, *, in_fmt="opus/16k/60ms", out_fmt="opus/24k/60ms",
-          budget_ms=1240, vad=None) -> dict:
+def ready(sid: str, *, in_fmt=None, out_fmt=None, budget_ms=None, vad=None) -> dict:
+    # 实测：上行 20 ms / 16 kHz；下行 60 ms / 16 kHz。别再报 24k。
     return {
         "type": "ready",
         "sid": sid,
-        "audio": {"in": in_fmt, "out": out_fmt},
-        "budget_ms": budget_ms,
+        "proto": 1,
+        "audio": {
+            "in": in_fmt or "pcm16/16000/20ms",
+            "out": out_fmt or "pcm16/16000/60ms",
+        },
+        "budget_ms": budget_ms if budget_ms is not None else settings.budget_ms,
         "server_time": now_ms(),
         "vad": vad or {"tail_ms": 300, "min_speech_ms": 200},
     }
@@ -46,10 +52,12 @@ def tts(state: str, seg: int = 0, text: str = "") -> dict:
 
 
 def result(house: str, reasons: list[str], line: str, latency: dict,
-           announce: dict | None = None) -> dict:
+           scores: dict | None = None, announce: dict | None = None) -> dict:
     assert house in HOUSES
     msg = {"type": "result", "house": house, "reasons": reasons,
            "line": line, "latency": latency}
+    if scores:
+        msg["scores"] = scores
     if announce:
         msg["announce"] = announce
     return msg

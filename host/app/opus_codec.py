@@ -13,6 +13,43 @@ _DECODER = None
 _ERROR: str | None = None
 
 
+def _install_unraisable_filter() -> None:
+    """opuslib's Decoder.__del__ raises when construction failed; keep logs clean."""
+    import sys
+
+    if getattr(sys, "_opus_filter_installed", False):
+        return
+    prev = sys.unraisablehook
+
+    def hook(unraisable):  # pragma: no cover - interpreter shutdown path
+        obj = repr(getattr(unraisable, "object", ""))
+        if "Decoder" in obj or "opuslib" in obj:
+            return
+        prev(unraisable)
+
+    sys.unraisablehook = hook
+    sys._opus_filter_installed = True
+
+
+_install_unraisable_filter()
+
+
+def _atexit_close() -> None:  # pragma: no cover - interpreter shutdown
+    """Drop the ctypes state before libopus is unloaded (opuslib __del__ bug)."""
+    global _DECODER
+    d, _DECODER = _DECODER, None
+    if d is not None:
+        try:
+            del d.decoder_state
+        except Exception:
+            pass
+
+
+import atexit
+
+atexit.register(_atexit_close)
+
+
 def _load_opuslib():
     global _ERROR
     try:

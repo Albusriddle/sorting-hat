@@ -1,12 +1,14 @@
+
 from __future__ import annotations
 import json
 from pathlib import Path
-from fastapi import FastAPI, Header, HTTPException, Body
+
+from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
-from . import judge, protocol
+from . import judge
 from .config import settings
-from .metrics import tail, record
+from .metrics import tail
 from .persona import load_houses, load_lines, load_prompt
 from .preheat import run_preheat
 from .providers import MockLLM
@@ -16,9 +18,19 @@ admin_app = FastAPI(title="sortinghat-admin")
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def _auth(token: str | None):
+def _is_local(req: Request) -> bool:
+    return req.client is not None and req.client.host in ("127.0.0.1", "::1")
+
+
+def _require(token: str | None) -> None:
     if token != settings.admin_token:
         raise HTTPException(status_code=401, detail="admin token required")
+
+
+def _require_or_local(req: Request, token: str | None) -> None:
+    if _is_local(req):
+        return
+    _require(token)
 
 
 @admin_app.get("/healthz")
@@ -28,67 +40,81 @@ async def healthz():
 
 @admin_app.get("/readyz")
 async def readyz():
-    last = ROOT / settings.data_dir / "preheat.json"
-    ok = last.exists()
-    return JSONResponse({"ok": ok, "preheat": json.loads(last.read_text()) if ok else None},
-                        status_code=200 if ok else 503)
+    path = ROOT / settings.data_dir / "preheat.json"
+    if not path.exists():
+        return JSONResponse({"ok": False, "reason": "preheat not run"}, status_code=503)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    ok = bool(data.get("ok"))
+    return JSONResponse({"ok": ok, "degraded": data.get("degraded", []),
+                         "preheat": data}, status_code=200 if ok else 503)
 
 
 @admin_app.post("/v1/preheat")
 async def preheat(x_admin_token: str | None = Header(default=None)):
-    _auth(x_admin_token)
-    res = await run_preheat()
-    return res
+    _require(x_admin_token)
+    return await run_preheat()
 
 
 @admin_app.post("/v1/replay")
-async def replay(payload: dict = Body(default={}), x_admin_token: str | None = Header(default=None)):
-    _auth(x_admin_token)
+async def replay(payload: dict = Body(default={}),
+                 x_admin_token: str | None = Header(default=None)):
+    _require(x_admin_token)
     text = payload.get("text") or "我最想要的是被认可，但我又不想说出来。"
     llm = MockLLM()
     p = await llm.complete(text)
     v = judge.decide(text, p, payload.get("recent", []),
-                     penalty=settings.recent3_penalty, max_share=settings.max_share)
-    return {"house": v["house"], "reasons": v["reasons"], "quote_ok": v["quote_ok"]}
+                     penalty=settings.recent3_penalty, max_share=settings.max_share,
+                     min_history=settings.min_history_for_balance)
+    return {"house": v["house"], "reasons": v["reasons"], "quote_ok": v["quote_ok"],
+            "insufficient": v.get("insufficient", False)}
 
 
 @admin_app.get("/v1/sessions")
 async def sessions(n: int = 20, x_admin_token: str | None = Header(default=None)):
-    _auth(x_admin_token)
+    _require(x_admin_token)
     return {"rows": tail(n)}
 
 
 @admin_app.get("/stats")
-async def stats():
+async def stats(req: Request, x_admin_token: str | None = Header(default=None)):
+    _require_or_local(req, x_admin_token)
     return STATE.snapshot()
 
 
 @admin_app.get("/v1/metrics", response_class=PlainTextResponse)
-async def metrics():
+async def metrics(req: Request, x_admin_token: str | None = Header(default=None)):
+    _require_or_local(req, x_admin_token)
     s = STATE.snapshot()
     last = s.get("last") or {}
     lat = last.get("latency") or {}
-    lines = [
-        f"# HELP sortinghat_sessions_total sessions served",
+    return "\n".join([
+        "# HELP sortinghat_sessions_total sessions served",
         f"sortinghat_sessions_total {s['sessions']}",
-        f"# HELP sortinghat_errors_total protocol errors",
+        "# HELP sortinghat_errors_total protocol errors",
         f"sortinghat_errors_total {s['errors']}",
-        f"# HELP sortinghat_ttfc_ms last session TTFC (host side)",
+        "# HELP sortinghat_ttfc_ms last session TTFC (host side)",
         f"sortinghat_ttfc_ms {lat.get('host_ms', -1)}",
-    ]
-    return "\n".join(lines) + "\n"
+    ]) + "\n"
 
 
 @admin_app.post("/v1/config")
-async def config(payload: dict = Body(default={}), x_admin_token: str | None = Header(default=None)):
-    _auth(x_admin_token)
-    STATE.config.update(payload)
-    return {"ok": True, "config": STATE.config}
+async def config(payload: dict = Body(default={}),
+                 x_admin_token: str | None = Header(default=None)):
+    _require(x_admin_token)
+    applied = {}
+    for key in ("max_share", "recent3_penalty", "min_history_for_balance",
+                "silence_ms", "silence_bye_ms", "min_audio_rms"):
+        if key in payload:
+            setattr(settings, key, type(getattr(settings, key))(payload[key]))
+            applied[key] = getattr(settings, key)
+    STATE.config.update(applied)
+    return {"ok": True, "applied": applied}
 
 
 @admin_app.post("/v1/halt")
-async def halt(payload: dict = Body(default={}), x_admin_token: str | None = Header(default=None)):
-    _auth(x_admin_token)
+async def halt(payload: dict = Body(default={}),
+               x_admin_token: str | None = Header(default=None)):
+    _require(x_admin_token)
     mode = payload.get("mode", "halt_new")
     if mode not in ("none", "halt_new", "stop_all"):
         raise HTTPException(status_code=400, detail="bad mode")
@@ -97,7 +123,8 @@ async def halt(payload: dict = Body(default={}), x_admin_token: str | None = Hea
 
 
 @admin_app.get("/", response_class=HTMLResponse)
-async def console():
+async def console(req: Request, x_admin_token: str | None = Header(default=None)):
+    _require_or_local(req, x_admin_token)
     return """<!doctype html><html lang="zh"><meta charset="utf-8">
 <title>掂量帽 · 大屏</title>
 <style>
@@ -125,12 +152,11 @@ async function tick(){
     const s=await (await fetch("/stats")).json();
     const last=s.last||{}; const v=last.latency||{};
     if(last.house){document.getElementById("house").textContent=NAMES[last.house]||last.house;}
-    const ul=document.getElementById("reasons");
-    if(last.latency){ul.innerHTML=(last.reasons||[]).map(r=>`<li>「${r}」</li>`).join("");}
+    if(last.reasons){document.getElementById("reasons").innerHTML=
+      last.reasons.map(r=>`<li>「${r}」</li>`).join("");}
     document.getElementById("lat").textContent=
       `TTFC ${v.host_ms||"-"} ms（上位机段） · ${last.text||""}`;
-    const w=Math.min(100,100*(v.host_ms||0)/1240);
-    document.getElementById("bar").style.width=w+"%";
+    document.getElementById("bar").style.width=Math.min(100,100*(v.host_ms||0)/1240)+"%";
   }catch(e){}
 }
 setInterval(tick,700); tick();

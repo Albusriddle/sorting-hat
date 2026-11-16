@@ -21,6 +21,14 @@
 // #define HAT_ENABLE_OPUS     // Opus 编解码（需要 arduino-audio-tools）
 // #define HAT_ENABLE_VAD      // 麦克风能量 VAD（依赖 HAT_ENABLE_MIC）
 
+// ---------------- 学院命名（S-05）----------------
+// 0 = 原创名（赤翎/玄渊/星枢/穗垣，IP 安全）
+// 1 = 哈利波特原名（格兰芬多/...，辨识度高但有版权风险）
+#define HAT_HOUSE_ORIGINAL   0
+
+// 唤醒词占用 5 号词条；1–4 号留给四句内容（S-08）
+#define ASR_WAKE_WORD_ID     5
+
 // ---------------- I2C 模块（组长驱动，已可用）----------------
 #define PIN_ASR_SDA      16
 #define PIN_ASR_SCL      17

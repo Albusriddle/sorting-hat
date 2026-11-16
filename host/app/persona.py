@@ -3,10 +3,13 @@ from __future__ import annotations
 import hashlib
 from functools import lru_cache
 from pathlib import Path
+
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 PERSONA = ROOT / "persona"
+
+BRIDGES = ["唔……让我看看。", "有意思，非常有意思。", "唔……别急。"]
 
 
 def load_houses() -> dict:
@@ -32,14 +35,28 @@ def sha256_of(p: Path) -> str:
 
 
 @lru_cache(maxsize=1)
+def houses_by_slug() -> dict:
+    data = load_houses()
+    return {h["slug"]: h for h in data.get("houses", [])}
+
+
+def display_name(house: str) -> str:
+    h = houses_by_slug().get(house)
+    return h["name"] if h else house
+
+
+@lru_cache(maxsize=1)
 def _lines() -> dict:
     return load_lines().get("lines", {})
 
 
 def pick_announcement(house: str, n: int) -> tuple[str, int]:
-    """Deterministic rotation over the pre-recorded announcement variants."""
     opts = _lines().get(house) or []
     if not opts:
         return ("", 0)
     v = n % len(opts)
     return (opts[v], v)
+
+
+def bridge_line(n: int) -> str:
+    return BRIDGES[n % len(BRIDGES)]

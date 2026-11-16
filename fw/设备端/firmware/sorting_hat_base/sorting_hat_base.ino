@@ -34,9 +34,7 @@
 #include "tts_xfs5152.h"
 #include "phrases_gbk.h"
 
-// 唤醒词是 1 号词条（模块里第一个烧的就是"分院帽"）。
-// 其余编号 = 观众说的内容。
-#define ASR_WAKE_WORD_ID 1
+// 唤醒词编号在 hat_config.h（5 号）；1–4 号是四句内容（S-08）。
 
 TwoWire TtsBus(1);
 voice::WonderEcho asr;
@@ -196,8 +194,11 @@ static void handle_button() {
 
   if (offline_active()) { offline_next_house(); return; }
 
-  // 短按：任何状态都可打断；ARMED 下短按 = 手动开始说话（备用入口）
-  if (hat_state_get() == HatState::ARMED) { start_listening("BTN_START"); return; }
+  // 短按：OFF/ARMED = 手动开始（无模块也能演）；其他状态 = 打断
+  if (hat_state_get() == HatState::OFF_ST || hat_state_get() == HatState::ARMED) {
+    start_listening("BTN_START");
+    return;
+  }
 
   comm_send_abort("button");
   hw_speaker_stop();

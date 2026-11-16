@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 import json
 import time
@@ -9,16 +10,19 @@ from .providers import build_providers
 
 ROOT = Path(__file__).resolve().parent.parent
 HOUSES = ("courage", "ambition", "wisdom", "loyalty")
+MIN_OPUS_BYTES = 1000
 
 
 async def run_preheat() -> dict:
-    steps = []
+    steps: list[dict] = []
+    degraded: list[str] = []
     t_all = time.monotonic()
 
-    def add(name, ok, ms, detail=""):
-        steps.append({"step": name, "ok": ok, "ms": round(ms, 1), "detail": detail})
+    def add(name, ok, ms, detail="", required=True):
+        steps.append({"step": name, "ok": ok, "required": required,
+                      "ms": round(ms, 1), "detail": detail})
 
-    # 1 persona files
+    # 1 persona
     t = time.monotonic()
     try:
         houses = load_houses(); lines = load_lines(); prompt = load_prompt()
@@ -31,7 +35,7 @@ async def run_preheat() -> dict:
 
     asr, llm, tts = build_providers(settings)
 
-    # 2 provider health
+    # 2 providers health
     t = time.monotonic()
     health = []
     for name, p in (("asr", asr), ("llm", llm), ("tts", tts)):
@@ -43,15 +47,19 @@ async def run_preheat() -> dict:
     add("providers", all(h["ok"] for h in health), (time.monotonic() - t) * 1000,
         json.dumps(health, ensure_ascii=False))
 
-    # 3 ASR warmup
+    # 3 ASR warm: mock can answer; AWS needs PCM, so it is a warning not a blocker
     t = time.monotonic()
-    try:
-        txt = await asr.final("测试")
-        add("asr", bool(txt), (time.monotonic() - t) * 1000, txt[:12])
-    except Exception as e:
-        add("asr", False, (time.monotonic() - t) * 1000, type(e).__name__ + ": " + str(e)[:50])
+    if settings.asr_provider in ("aws", "transcribe"):
+        add("asr", True, 0.0, "skipped (needs PCM; text path is primary)", required=False)
+        degraded.append("asr_warm_skipped")
+    else:
+        try:
+            txt = await asr.final("测试")
+            add("asr", bool(txt), (time.monotonic() - t) * 1000, txt[:12])
+        except Exception as e:
+            add("asr", False, (time.monotonic() - t) * 1000, type(e).__name__)
 
-    # 4 LLM schema warm (Bedrock: real schema; read timeout must be >=150 s)
+    # 4 LLM warm
     t = time.monotonic()
     try:
         p = await llm.complete("测试")
@@ -67,24 +75,30 @@ async def run_preheat() -> dict:
     except Exception as e:
         add("tts", False, (time.monotonic() - t) * 1000, type(e).__name__ + ": " + str(e)[:50])
 
-    # 6 preroll assets: 4 houses x 3 variants
+    # 6 preroll: optional by default (announcement is spoken by the device TTS)
     t = time.monotonic()
     d = preroll_dir()
     need = [f"{h}-{i}.opus" for h in HOUSES for i in (1, 2, 3)]
-    missing = [n for n in need if not (d / n).exists()]
-    for n in missing:
-        (d / n).write_bytes(b"PLACEHOLDER")
-    add("preroll", True, (time.monotonic() - t) * 1000,
-        f"{len(need)} files, created={len(missing)}")
+    bad = []
+    for n in need:
+        p = d / n
+        if not p.exists() or p.stat().st_size < MIN_OPUS_BYTES or p.read_bytes()[:4] != b"OggS":
+            bad.append(n)
+    required = settings.prerecord_required
+    add("preroll", not bad, (time.monotonic() - t) * 1000,
+        f"{len(need) - len(bad)}/{len(need)} valid", required=required)
+    if bad:
+        degraded.append("preroll_placeholder")
 
-    # 7 write preheat.json (fail-closed: any step false => not ready)
+    # 7 write
     t = time.monotonic()
-    ok = all(s["ok"] for s in steps)
-    out = {"ok": ok, "steps": steps, "total_ms": round((time.monotonic() - t_all) * 1000, 1)}
+    required_ok = all(s["ok"] for s in steps if s["required"])
+    out = {"ok": required_ok, "degraded": degraded, "steps": steps,
+           "total_ms": round((time.monotonic() - t_all) * 1000, 1)}
     p = ROOT / settings.data_dir / "preheat.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-    add("write", True, (time.monotonic() - t) * 1000, str(p))
+    add("write", True, (time.monotonic() - t) * 1000, str(p), required=False)
     out["steps"] = steps
-    out["ok"] = all(s["ok"] for s in steps)
+    out["ok"] = all(s["ok"] for s in steps if s["required"])
     return out
