@@ -50,3 +50,15 @@ Arduino IDE 2.x + esp32 板子包，板型选 **ESP32 Dev Module**，波特率 1
 - Opus 代码已写、真机未验证；VAD 依赖真麦。
 - 词条表必须与模块烧录一致：1–4 号内容，**5 号唤醒**（`ASR_WAKE_WORD_ID`）。
 - 无麦时上行是全零帧，上位机 RMS 闸会拦；这属预期行为。
+
+
+## 7. 2026-11-17 变更（烧板请一并验证）
+
+| 项 | 行为 |
+|---|---|
+| `t0` 打点 | 移到 `comm_send_vad_end()` **之前**（3 处），避免 `t5b < t0` |
+| 识别即"听到了" | `poll_asr` 在 `hat_intent_on_word_id()` 后 `comm_send_vad_start()` |
+| 监听超时 | `LISTEN_TIMEOUT_MS=30000`（晚于 host 的 20 s 收尾） |
+| `tts{stop}` | **不硬停**合成；只有 `abort`/按钮才 `tts.stop()` |
+| 时间戳打印 | `hat_ts_dump` 有符号；`t5b<t0` 打 `n/a`，不再出现 4294966xxx |
+| 学院名 | 默认原创（`HAT_HOUSE_ORIGINAL 0`） |

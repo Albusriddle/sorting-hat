@@ -18,6 +18,8 @@
 | 只听到"没听清" | `/stats.audio.rms` 是否 <50（无麦时是 0，走 `text` 才对） |
 | readyz 503 | `python tasks.py preheat`，看哪个 required 步骤红 |
 | 大屏空白 | 大屏必须从 `127.0.0.1:8080` 打开，或带 `X-Admin-Token` |
+| 看到 bye 但连接没断 | 正常：host 现在任何 `bye` 都只结算本轮，不断连 |
+| 按了 halt 还在跑 | `halt_new/stop_all` 只拦新 `listen`，不打断在途会话 |
 | 改了 env 不生效 | 先停旧进程（端口占用），再 `python tasks.py up` |
 | 静音救场太早/太晚 | `SILENCE_MS` 必须大于最长台词（建议 8 s）；`SILENCE_BYE_MS ≥ SILENCE_MS+5 s` |
 

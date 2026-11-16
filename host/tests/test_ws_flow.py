@@ -177,3 +177,28 @@ def test_ttfc_is_none_when_device_clock_backwards():
     row = tail(1)[0]
     assert row["ttfc_ms"] is None
     assert row["clock_skew"] == -20
+
+
+def test_aborted_session_is_recorded():
+    """失败轮次也要落一行（outcome=aborted），便于复盘。"""
+    from app.metrics import tail
+    import time as _t
+
+    before = len(tail(200))
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        ws.send_json({"type": "listen", "state": "start"})
+        ws.send_bytes(b"\x04" + b"\x00\x00\x00\x00" + b"\x00" * 640)
+        ws.send_json({"type": "vad", "ev": "speech_end"})
+        for _ in range(80):
+            m = ws.receive()
+            if "bytes" in m:
+                continue
+            d = json.loads(m["text"])
+            if d.get("type") == "tts" and d.get("state") == "stop":
+                break
+    _t.sleep(0.2)
+    rows = tail(200)
+    assert len(rows) >= before + 1
+    assert rows[-1]["outcome"] == "aborted"
+    assert rows[-1]["reason"] == "no_text_mock"

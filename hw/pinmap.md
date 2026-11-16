@@ -17,9 +17,9 @@
 
 | 信号 | GPIO | 说明 |
 |---|---|---|
-| ASR_SDA | 16 | Wire，100 kHz |
+| ASR_SDA | 16 | Wire，100 kHz；模块地址 **0x79**（官方） |
 | ASR_SCL | 17 | Wire，100 kHz |
-| TTS_SDA | 19 | Wire1，10 kHz（芯片要求 ≤15 kHz） |
+| TTS_SDA | 19 | Wire1，10 kHz；模块地址 **0x40** |
 | TTS_SCL | 18 | Wire1，10 kHz |
 | BTN | 0 | 板载 BOOT 键；短按=开始/打断，长按 2 s=重连/退出离线 |
 | LED | 2 | 板载蓝灯（仅状态提示，不是 WS2812） |

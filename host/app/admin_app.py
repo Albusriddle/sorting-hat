@@ -11,7 +11,7 @@ from .config import settings
 from .metrics import tail
 from .persona import load_houses, load_lines, load_prompt
 from .preheat import run_preheat
-from .providers import MockLLM
+from .providers import MockLLM, build_providers
 from .state import STATE
 
 admin_app = FastAPI(title="sortinghat-admin")
@@ -60,13 +60,20 @@ async def replay(payload: dict = Body(default={}),
                  x_admin_token: str | None = Header(default=None)):
     _require(x_admin_token)
     text = payload.get("text") or "我最想要的是被认可，但我又不想说出来。"
-    llm = MockLLM()
-    p = await llm.complete(text)
+    provider = "mock"
+    try:
+        llm = build_providers(settings)[1]
+        provider = getattr(llm, "name", "mock")
+        p = await llm.complete(text)
+    except Exception:
+        llm = MockLLM()
+        provider = "mock"
+        p = await llm.complete(text)
     v = judge.decide(text, p, payload.get("recent", []),
                      penalty=settings.recent3_penalty, max_share=settings.max_share,
                      min_history=settings.min_history_for_balance)
     return {"house": v["house"], "reasons": v["reasons"], "quote_ok": v["quote_ok"],
-            "insufficient": v.get("insufficient", False)}
+            "insufficient": v.get("insufficient", False), "provider": provider}
 
 
 @admin_app.get("/v1/sessions")

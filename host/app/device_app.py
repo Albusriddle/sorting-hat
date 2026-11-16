@@ -83,6 +83,12 @@ async def voice(ws: WebSocket):
     last_text = ""
     last_speech = 0.0
     rescued = False
+    heard = asyncio.Event()
+
+    def record_aborted(reason: str) -> None:
+        record({"sid": sid, "outcome": "aborted", "reason": reason,
+                "text": last_text, "degrade": [reason],
+                "audio": STATE.session_audio.get(sid, {})})
 
     def flush(session_id: str, dev_ts: dict | None = None) -> None:
         row = pending.pop(session_id, None)
@@ -120,7 +126,12 @@ async def voice(ws: WebSocket):
         # watchdog 只管"这一轮听", 结果出来就停
         if watchdog and not watchdog.done():
             watchdog.cancel()
-        if not out or not out.get("verdict"):
+        if not out:
+            return
+        if out.get("aborted"):
+            record_aborted(str(out.get("aborted")))
+            return
+        if not out.get("verdict"):
             return
         row = {"sid": sid, "text": out.get("text"),
                "house": out["verdict"]["house"],
@@ -134,14 +145,19 @@ async def voice(ws: WebSocket):
 
     async def silence_monitor():
         nonlocal rescued
-        while True:
-            await asyncio.sleep(0.5)
+        while not heard.is_set():
+            await asyncio.sleep(0.2)
+            if heard.is_set():
+                return
             if not last_speech:
                 continue
             idle = time.monotonic() - last_speech
             if idle >= settings.silence_ms / 1000 and not rescued:
                 rescued = True
-                await send_tts_line("唔……你在想什么呢？")
+                # shield：即使此时收到 speech_start，也让这一句完整发完
+                await asyncio.shield(send_tts_line("唔……你在想什么呢？"))
+                if heard.is_set():
+                    return
             if idle >= settings.silence_bye_ms / 1000:
                 await ws.send_json(protocol.bye("silence"))
                 try:
@@ -167,6 +183,7 @@ async def voice(ws: WebSocket):
         nonlocal last_speech, rescued
         last_speech = time.monotonic()
         rescued = False
+        heard.clear()
         return asyncio.create_task(silence_monitor())
 
     try:
@@ -193,7 +210,7 @@ async def voice(ws: WebSocket):
 
                 elif t == "vad" and data.get("ev") == "speech_start":
                     last_speech = time.monotonic()
-                    await cancel(silence_task)     # "听到了" → 停表
+                    heard.set()                    # "听到了" → 停表（不打断正在发的句子）
 
                 elif t == "vad" and data.get("ev") == "speech_end":
                     last_speech = time.monotonic()
@@ -202,16 +219,18 @@ async def voice(ws: WebSocket):
                     pcm = audio.pcm()
                     stats = {**audio.stats(), "rms": pcm_rms(pcm)}
                     STATE.set_audio(sid, stats)
-                    await cancel(silence_task, watchdog)   # 计时按"轮"，本轮到此结束
+                    heard.set()                    # 本轮计时结束；watchdog 留到结果完成
                     t0 = ms()
                     has_text = bool((last_text or "").strip())
                     if has_text:
                         pass                                # 有文字就用文字，完全不看音频
                     elif settings.asr_provider == "mock":
                         # mock ASR 不看 pcm，不能凭"底噪"凭空判院
+                        record_aborted("no_text_mock")
                         await send_tts_line("唔……我没听清，再说一次？")
                         continue
                     elif not pcm or stats["rms"] < settings.min_audio_rms:
+                        record_aborted("silent_audio")
                         await send_tts_line("唔……我没听清，再说一次？")
                         continue
                     task = asyncio.create_task(ENGINE.run(emit, last_text, t0=t0, t1=ms(),

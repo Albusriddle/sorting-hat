@@ -17,7 +17,9 @@ def test_replay_requires_token():
 def test_replay_returns_house():
     r = client.post("/v1/replay", json={"text": "我想赢，我要第一"}, headers=H)
     assert r.status_code == 200
-    assert r.json()["house"] in ("courage", "ambition", "wisdom", "loyalty")
+    body = r.json()
+    assert body["house"] in ("courage", "ambition", "wisdom", "loyalty")
+    assert body["provider"] in ("mock", "mock-llm")
 
 
 def test_halt_roundtrip():

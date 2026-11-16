@@ -2,7 +2,7 @@
 
 > 对应输入：`烧板联调问题-11-17.md`（设备端联调记录）
 > 对应提交：**`e29f38c`**（`42e50f5..e29f38c`，已推 `origin/main`）
-> 回归：**37 passed**；冒烟（全零 PCM + text）`house=loyalty`；8 秒计时观察 PASS
+> 回归：第一轮 37 passed；两轮累计 **43 passed**（见文末第二轮）；冒烟（全零 PCM + text）`house=loyalty`；8 秒计时观察 PASS
 
 ## 0. 结论
 
@@ -134,5 +134,5 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 | 5 | 设备 25s vs host 20s | 设备改 30000 ms | 固件 | 代码审查 |
 | 6 | "声音来自 host PCM"误解 | 文档改为"CSK4002 念 `tts.text`；0x02 在无功放时忽略" | 文档 | — |
 
-回归：**42 passed**；冒烟（全零 PCM + text）`house=loyalty`；启动校验输出
+回归：**43 passed**；冒烟（全零 PCM + text）`house=loyalty`；启动校验输出
 `invalid settings: SILENCE_BYE_MS(15000) must be >= SILENCE_MS(15000) + 5000`。
