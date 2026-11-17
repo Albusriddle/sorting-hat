@@ -95,7 +95,7 @@ def test_two_sessions_one_connection_after_bye_done():
     from app.metrics import tail
     import time as _t
 
-    before = len(tail(200))
+    before = len(tail(10000))
     with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
         ws.receive_json()
         r1 = _run_one(ws, "我在乎身边的人，他们需要我的时候我不会缺席。")
@@ -107,7 +107,7 @@ def test_two_sessions_one_connection_after_bye_done():
         ws.send_json({"type": "bye", "reason": "done",
                       "dev_ts": {"t_arm": 20, "t0": 30, "t5a": 31, "t5b": 32}})
     _t.sleep(0.3)
-    rows = tail(200)
+    rows = tail(10000)
     assert len(rows) >= before + 2
     assert rows[-2].get("ttfc_ms") == 2 and rows[-1].get("ttfc_ms") == 2
 
@@ -184,7 +184,7 @@ def test_aborted_session_is_recorded():
     from app.metrics import tail
     import time as _t
 
-    before = len(tail(200))
+    before = len(tail(10000))
     with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
         ws.receive_json()
         ws.send_json({"type": "listen", "state": "start"})
@@ -198,7 +198,7 @@ def test_aborted_session_is_recorded():
             if d.get("type") == "tts" and d.get("state") == "stop":
                 break
     _t.sleep(0.2)
-    rows = tail(200)
+    rows = tail(10000)
     assert len(rows) >= before + 1
     assert rows[-1]["outcome"] == "aborted"
     assert rows[-1]["reason"] == "no_text_mock"
@@ -209,7 +209,7 @@ def test_abort_records_row():
     from app.metrics import tail
     import time as _t
 
-    before = len(tail(200))
+    before = len(tail(10000))
     with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
         ws.receive_json()
         ws.send_json({"type": "listen", "state": "start"})
@@ -223,7 +223,37 @@ def test_abort_records_row():
             if d.get("type") == "bye":
                 break
     _t.sleep(0.2)
-    rows = tail(200)
+    rows = tail(10000)
     assert len(rows) >= before + 1
     assert rows[-1]["outcome"] == "aborted"
     assert rows[-1]["reason"] == "doff"
+
+
+def test_new_firmware_vad_start_then_end():
+    """新固件会先发 vad speech_start（"听到了"），再 vad_end；不应影响判院。"""
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        ws.send_json({"type": "listen", "state": "start"})
+        ws.send_json({"type": "text", "text": "我在乎身边的人，他们需要我的时候我不会缺席。"})
+        ws.send_json({"type": "vad", "ev": "speech_start"})
+        ws.send_json({"type": "vad", "ev": "speech_end"})
+        for _ in range(400):
+            m = ws.receive()
+            if "bytes" in m:
+                continue
+            d = json.loads(m["text"])
+            if d["type"] == "result":
+                assert d["house"] == "loyalty"
+                return
+        raise AssertionError("no result after vad_start/vad_end")
+
+
+def test_bye_timeout_keeps_connection():
+    """旧/新固件的 bye{timeout} 都只结算本轮，连接可继续（双版本兼容）。"""
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        r1 = _run_one(ws, "我最怕输，但我更怕自己在关键时候退缩。")
+        assert r1["house"] == "courage"
+        ws.send_json({"type": "bye", "reason": "timeout"})
+        r2 = _run_one(ws, "我喜欢把一件事拆开想清楚，再决定要不要做。")
+        assert r2["house"] == "wisdom"

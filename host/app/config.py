@@ -27,7 +27,7 @@ class Settings:
 
     # session
     session_max_ms: int = int(_env("SESSION_MAX_MS", "120000"))
-    silence_ms: int = int(_env("SILENCE_MS", "8000"))
+    silence_ms: int = int(_env("SILENCE_MS", "12000"))
     silence_bye_ms: int = int(_env("SILENCE_BYE_MS", "20000"))
     budget_ms: int = int(_env("BUDGET_MS", "1240"))
     text_max_chars: int = int(_env("TEXT_MAX_CHARS", "200"))

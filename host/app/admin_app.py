@@ -7,7 +7,7 @@ from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from . import judge
-from .config import settings
+from .config import settings, validate_settings
 from .metrics import tail
 from .persona import load_houses, load_lines, load_prompt
 from .preheat import run_preheat
@@ -108,12 +108,20 @@ async def metrics(req: Request, x_admin_token: str | None = Header(default=None)
 async def config(payload: dict = Body(default={}),
                  x_admin_token: str | None = Header(default=None)):
     _require(x_admin_token)
+    keys = ("max_share", "recent3_penalty", "min_history_for_balance",
+            "silence_ms", "silence_bye_ms", "min_audio_rms")
+    old = {k: getattr(settings, k) for k in keys}
     applied = {}
-    for key in ("max_share", "recent3_penalty", "min_history_for_balance",
-                "silence_ms", "silence_bye_ms", "min_audio_rms"):
-        if key in payload:
-            setattr(settings, key, type(getattr(settings, key))(payload[key]))
-            applied[key] = getattr(settings, key)
+    try:
+        for key in keys:
+            if key in payload:
+                setattr(settings, key, type(getattr(settings, key))(payload[key]))
+                applied[key] = getattr(settings, key)
+        validate_settings()                 # silence/bye 组合必须一起过
+    except (TypeError, ValueError) as exc:
+        for key, value in old.items():
+            setattr(settings, key, value)
+        raise HTTPException(status_code=400, detail=f"invalid config: {exc}")
     STATE.config.update(applied)
     return {"ok": True, "applied": applied}
 

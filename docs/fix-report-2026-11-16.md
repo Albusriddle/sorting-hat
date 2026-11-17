@@ -2,7 +2,7 @@
 
 > 对应输入：`烧板联调问题-11-17.md`（设备端联调记录）
 > 对应提交：**`e29f38c`**（`42e50f5..e29f38c`，已推 `origin/main`）
-> 回归：第一轮 37 passed；两轮累计 43，当前 **44**（见文末第二轮）；冒烟（全零 PCM + text）`house=loyalty`；8 秒计时观察 PASS
+> 回归：第一轮 37 passed；两轮累计 43，当前 **48**（见文末第二轮）；冒烟（全零 PCM + text）`house=loyalty`；8 秒计时观察 PASS
 
 ## 0. 结论
 
@@ -134,7 +134,7 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 | 5 | 设备 25s vs host 20s | 设备改 30000 ms | 固件 | 代码审查 |
 | 6 | "声音来自 host PCM"误解 | 文档改为"CSK4002 念 `tts.text`；0x02 在无功放时忽略" | 文档 | — |
 
-回归：**43 passed**（第三轮后 44）；冒烟（全零 PCM + text）`house=loyalty`；启动校验输出
+回归：**43 passed**（第三轮后 44；第四轮后 48）；冒烟（全零 PCM + text）`house=loyalty`；启动校验输出
 `invalid settings: SILENCE_BYE_MS(15000) must be >= SILENCE_MS(15000) + 5000`。
 
 
@@ -152,3 +152,18 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 | 6 | providers/runbook 34、runbook/PROGRESS 的 `.env` | 改 44、改 export | 文档抽查 |
 
 回归：**44 passed**。
+
+
+---
+
+# 附：第四轮（2026-11-17 上午，host 侧不依赖硬件）修复
+
+| # | 问题 | 方案 | 验证 |
+|---|---|---|---|
+| 1 | 静音默认值不够覆盖"慢说+停顿" | 默认 `SILENCE_MS=12000`（`SILENCE_BYE_MS=20000`） | `test_config.py` |
+| 2 | `/v1/config` 运行时可绕过校验 | 改完立即 `validate_settings()`，失败回滚并 400 | `test_config_rejects_invalid_silence_pair` |
+| 3 | 旧/新固件行为差异未回归 | 新增 `vad_start→vad_end`、`bye{timeout}` 复用连接两条测试 | 48 passed |
+| 4 | 文档计数/唤醒词/过期说法 | README/PROGRESS/providers/runbook 48；handoff F3/H2 与 fw/README 改 `kai shi` | 文档抽查 |
+| 5 | 真机验收口径缺失 | 新增 `docs/accept-host-2026-11-17.md`（旧板可直接跑） | 文档 |
+
+回归：**48 passed**。

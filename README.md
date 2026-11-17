@@ -4,7 +4,7 @@
 
 三层交付：`hw/`（硬件与实测）、`fw/设备端/`（下位机，ESP32-WROOM-32D + Arduino）、`host/`（上位机，Python/FastAPI）。
 
-> **现状（2026-11-17）**：控制面闭环、判词由「词条文本」驱动；没有麦克风/功放，真实音频链路未打通（已接受）。设备端已完成 ASR 词条识别、四院判院与 CSK4002 出声；上位机 43 条测试全绿。详见 [修复报告](docs/fix-report-2026-11-16.md)。
+> **现状（2026-11-17）**：控制面闭环、判词由「词条文本」驱动；没有麦克风/功放，真实音频链路未打通（已接受）。设备端已完成 ASR 词条识别、四院判院与 CSK4002 出声；上位机 48 条测试全绿。详见 [修复报告](docs/fix-report-2026-11-16.md)。
 
 ---
 
@@ -78,7 +78,7 @@ pip install -r requirements-audio.txt   # 可选：Opus 解码；没有就走 0x
 export DEVICE_TOKEN=dev-token
 export ADMIN_TOKEN=dev-token
 
-python tasks.py test        # 44 passed
+python tasks.py test        # 48 passed
 python tasks.py up          # device :8443 / admin :8080（admin 只绑 127.0.0.1）
 ```
 
@@ -155,7 +155,7 @@ host/
   app/               device_app, engine, judge, providers(_aws), protocol,
                      audio, opus_codec, preheat, admin_app, metrics, state, run
   persona/           houses.yaml, lines.yaml, prompt.md
-  tests/             43 条（judge/协议/引擎/WS/AWS/Opus/配置）
+  tests/             48 条（judge/协议/引擎/WS/AWS/Opus/配置）
   tasks.py           Windows 友好任务入口
 docs/                协议、providers、runbook、现状、修复报告、handoff、design/（历史）
 fixtures/            回放样例
@@ -175,7 +175,7 @@ tools/               仓库自检、发布脚本
 | `ASR_PROVIDER` / `LLM_PROVIDER` / `TTS_PROVIDER` | `mock` | 改 `aws` 走云端 |
 | `MIN_AUDIO_RMS` | `50` | 低于此值视为静音；有 `text` 时不受影响 |
 | `HISTORY_WINDOW` / `MIN_HISTORY_FOR_BALANCE` | `10` / `10` | 反集中/配额只在攒够历史后启用 |
-| `SILENCE_MS` / `SILENCE_BYE_MS` | `8000` / `20000` | 救场 / 收尾；**bye 必须 ≥ silence+5 s，否则拒绝启动** |
+| `SILENCE_MS` / `SILENCE_BYE_MS` | `12000` / `20000` | 救场 / 收尾；**bye 必须 ≥ silence+5 s，否则拒绝启动** |
 | `TTS_PACE_MS` | `60` | 下行帧节拍；测试置 0 |
 | `REQUIRE_TLS` / `TLS_CERT` / `TLS_KEY` | `0` / 空 | 开 TLS 时缺证书拒绝启动 |
 
@@ -186,7 +186,7 @@ tools/               仓库自检、发布脚本
 ## 9. 测试与验收
 
 ```bash
-python -m pytest -q            # 44 passed
+python -m pytest -q            # 48 passed
 python tools/check_tree.py     # missing: none / extra: none
 python tasks.py preheat        # ok:true
 python tasks.py smoke          # result + scores + announce

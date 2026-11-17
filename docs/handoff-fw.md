@@ -21,7 +21,7 @@
 |---|---|---|---|
 | F1 | 学院名双套 + 默认原创 | `phrases_gbk.h`（已由 `tools/gen_phrases.py` 重新生成）、`hat_config.h` 的 `HAT_HOUSE_ORIGINAL 0` | 串口 `[TTS] house=courage (赤翎)`，耳朵听到"赤翎" |
 | F2 | 桥接句出声 | `hat_comm.cpp` 的 `tts{start}` → `tts.speakUTF8(text)` | 1 m 处听到"唔……让我看看。"这类整句 |
-| F3 | 唤醒改 5 号 | `hat_config.h` 的 `ASR_WAKE_WORD_ID 5`；模块烧 5 条（1–4 内容，5 唤醒） | 串口 `A` 打印 `[INTENT] 识别到 1 号`；说"分院帽"（5 号）能唤醒 |
+| F3 | 唤醒改 5 号 | `hat_config.h` 的 `ASR_WAKE_WORD_ID 5`；模块烧 5 条（1–4 内容，5 唤醒） | 串口 `A` 打印 `[INTENT] 识别到 1 号`；说"开始"（5 号，`kai shi`）能唤醒 |
 | F4 | `result` 后补 `bye{done}` | `hat_comm.cpp` 的 `result` 分支（已加） | 串口 `[WS-TX] bye done (dev_ts …)`；host `/v1/sessions` 的 `ttfc_ms` 非空 |
 | F5 | `tts{stop}` **不要**硬停合成 | `hat_comm.cpp` 的 stop 分支去掉 `tts.stop()`；只在 `abort`/按钮里停 | 桥接句能念完；按 `b` 能立刻打断 |
 | F6 | 功放 LRC 改 21 | `hat_config.h` 的 `PIN_SPK_LRC 21`（无 SPK，仅防冲突） | 编译通过；接线时不要再接 16 |
@@ -31,7 +31,7 @@
 | # | 项 | 说明 |
 |---|---|---|
 | H1 | 模块词条最终文案 | 1–4 句内容必须与 `hat_intent.cpp` 的四句**逐字一致**（模块里烧拼音，编号对应） |
-| H2 | 5 号唤醒词 | 模块里第 5 条烧"分院帽"；`ASR_WAKE_WORD_ID` 与之一致 |
+| H2 | 5 号唤醒词 | 模块里第 5 条烧"开始"（`kai shi`）；`ASR_WAKE_WORD_ID` 与之一致 |
 | H3 | 学院名选型 | 默认原创（IP 安全）；若要原名，改 `HAT_HOUSE_ORIGINAL 1` 重烧，host 不用改 |
 | H4 | 麦克风 | 没有就是全零帧；若今天能加 INMP441/USB 声卡，告诉我，host 的 `MIN_AUDIO_RMS` 与 Transcribe 可直接启用 |
 | H5 | 喇叭音量 | CSK4002 板载喇叭；1 m 处能否听清请实测，必要时加外置音箱（host 不控制音量） |

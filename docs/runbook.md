@@ -2,7 +2,7 @@
 
 1. `cd host`，`export DEVICE_TOKEN=… ADMIN_TOKEN=…`（`.env` 不会自动加载；键名见 `.env.example`）；设备 `secrets.h` 的 `TOKEN` 与 `DEVICE_TOKEN` 一致。
 2. `pip install -r requirements.txt`（可选 `-r requirements-audio.txt`）。
-3. `python tasks.py test` → 44 passed。
+3. `python tasks.py test` → 48 passed。
 4. `python tasks.py up`（device :8443 / admin :8080）。
 5. `python tasks.py preheat` → `ok:true`；若 `degraded:["preroll_placeholder"]` 可上台（宣布句走设备 TTS）。
 6. `python tasks.py ready` → 200。
@@ -21,7 +21,7 @@
 | 看到 bye 但连接没断 | 正常：host 现在任何 `bye` 都只结算本轮，不断连 |
 | 按了 halt 还在跑 | `halt_new/stop_all` 只拦新 `listen`，不打断在途会话 |
 | 改了 env 不生效 | 先停旧进程（端口占用），再 `python tasks.py up` |
-| 静音救场太早/太晚 | `SILENCE_MS` 必须大于最长台词（建议 8 s）；`SILENCE_BYE_MS ≥ SILENCE_MS+5 s` |
+| 静音救场太早/太晚 | `SILENCE_MS` 必须覆盖"唤醒后停顿 + 慢说"（建议 12 s）；`SILENCE_BYE_MS ≥ SILENCE_MS+5 s` |
 
 ## 主持提示（半双工）
 

@@ -25,3 +25,22 @@ def test_replay_returns_house():
 def test_halt_roundtrip():
     assert client.post("/v1/halt", json={"mode": "halt_new"}, headers=H).json()["halt"] == "halt_new"
     assert client.post("/v1/halt", json={"mode": "none"}, headers=H).json()["halt"] == "none"
+
+
+def test_config_rejects_invalid_silence_pair():
+    old = (settings.silence_ms, settings.silence_bye_ms)
+    r = client.post("/v1/config",
+                    json={"silence_ms": 15000, "silence_bye_ms": 15000}, headers=H)
+    assert r.status_code == 400
+    assert (settings.silence_ms, settings.silence_bye_ms) == old
+
+
+def test_config_applies_valid_pair():
+    old = (settings.silence_ms, settings.silence_bye_ms)
+    try:
+        r = client.post("/v1/config",
+                        json={"silence_ms": 12000, "silence_bye_ms": 20000}, headers=H)
+        assert r.status_code == 200
+        assert settings.silence_ms == 12000 and settings.silence_bye_ms == 20000
+    finally:
+        settings.silence_ms, settings.silence_bye_ms = old
