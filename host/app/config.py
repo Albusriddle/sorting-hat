@@ -29,6 +29,7 @@ class Settings:
     session_max_ms: int = int(_env("SESSION_MAX_MS", "120000"))
     silence_ms: int = int(_env("SILENCE_MS", "12000"))
     silence_bye_ms: int = int(_env("SILENCE_BYE_MS", "20000"))
+    silence_hard_cap_ms: int = int(_env("SILENCE_HARD_CAP_MS", "28000"))
     budget_ms: int = int(_env("BUDGET_MS", "1240"))
     text_max_chars: int = int(_env("TEXT_MAX_CHARS", "200"))
     tts_bridge_max_chars: int = int(_env("TTS_BRIDGE_MAX_CHARS", "40"))
@@ -42,7 +43,7 @@ class Settings:
 
     # judge
     history_window: int = int(_env("HISTORY_WINDOW", "10"))
-    min_history_for_balance: int = int(_env("MIN_HISTORY_FOR_BALANCE", "10"))
+    min_history_for_balance: int = int(_env("MIN_HISTORY_FOR_BALANCE", "9999"))
     max_share: float = float(_env("MAX_SHARE", "0.40"))
     recent3_penalty: float = float(_env("RECENT3_PENALTY", "0.85"))
 
@@ -74,3 +75,42 @@ def validate_settings(s: Settings | None = None) -> None:
         raise ValueError("RECENT3_PENALTY must be in (0, 1]")
     if s.history_window <= 0 or s.min_history_for_balance <= 0:
         raise ValueError("HISTORY_WINDOW / MIN_HISTORY_FOR_BALANCE must be > 0")
+    if s.silence_hard_cap_ms > 29000:
+        # 固件 LISTEN_TIMEOUT_MS=30000，主机一轮不能超过它，否则两个 bye 打架
+        raise ValueError("SILENCE_HARD_CAP_MS must be <= 29000 (device timeout is 30000)")
+    if s.silence_hard_cap_ms < s.silence_ms + 5000:
+        raise ValueError("SILENCE_HARD_CAP_MS must be >= SILENCE_MS + 5000")
+
+
+def mask(secret: str) -> str:
+    """Show only the last 4 chars so logs/selfcheck never leak a token."""
+    if not secret:
+        return "(empty)"
+    return "***" + secret[-4:] if len(secret) > 4 else "***"
+
+
+def effective() -> dict:
+    """The values that actually govern a demo run; printed at startup."""
+    return {
+        "silence_ms": settings.silence_ms,
+        "silence_bye_ms": settings.silence_bye_ms,
+        "silence_hard_cap_ms": settings.silence_hard_cap_ms,
+        "min_history_for_balance": settings.min_history_for_balance,
+        "history_window": settings.history_window,
+        "max_share": settings.max_share,
+        "recent3_penalty": settings.recent3_penalty,
+        "min_audio_rms": settings.min_audio_rms,
+        "asr_provider": settings.asr_provider,
+        "llm_provider": settings.llm_provider,
+        "tts_provider": settings.tts_provider,
+        "tts_pace_ms": settings.tts_pace_ms,
+        "require_tls": settings.require_tls,
+        "device_token": mask(settings.device_token),
+        "admin_token": mask(settings.admin_token),
+        "balance_active": settings.min_history_for_balance <= settings.history_window,
+    }
+
+
+def banner() -> str:
+    import json
+    return "[CFG] " + json.dumps(effective(), ensure_ascii=False, sort_keys=True)

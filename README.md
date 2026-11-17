@@ -179,8 +179,8 @@ tools/               仓库自检、发布脚本
 | `PORT` / `ADMIN_PORT` | `8443` / `8080` | 设备面 / 管理面（仅回环） |
 | `ASR_PROVIDER` / `LLM_PROVIDER` / `TTS_PROVIDER` | `mock` | 改 `aws` 走云端 |
 | `MIN_AUDIO_RMS` | `50` | 低于此值视为静音；有 `text` 时不受影响 |
-| `HISTORY_WINDOW` / `MIN_HISTORY_FOR_BALANCE` | `10` / `10` | 反集中/配额只在攒够历史后启用 |
-| `SILENCE_MS` / `SILENCE_BYE_MS` | `12000` / `20000` | 救场 / 收尾；**bye 必须 ≥ silence+5 s，否则拒绝启动** |
+| `HISTORY_WINDOW` / `MIN_HISTORY_FOR_BALANCE` | `10` / `9999` | 反集中/配额；**默认关闭**（同句同果），要开就设成 10 |
+| `SILENCE_MS` / `SILENCE_BYE_MS` / `SILENCE_HARD_CAP_MS` | `12000` / `20000` / `28000` | 救场 / 收尾 / 单轮硬上限；bye 必须 ≥ silence+5 s，硬上限必须 ≤29 s（固件 30 s 超时） |
 | `TTS_PACE_MS` | `60` | 下行帧节拍；测试置 0 |
 | `REQUIRE_TLS` / `TLS_CERT` / `TLS_KEY` | `0` / 空 | 开 TLS 时缺证书拒绝启动 |
 
@@ -198,6 +198,8 @@ python tasks.py smoke          # result + scores + announce
 ```
 
 - 判决纯函数；空 evidence / 全零分 → `insufficient`，不判院。
+- 平衡机制默认关闭（`MIN_HISTORY_FOR_BALANCE=9999`）：**同一个词条永远判同一个学院**。
+- 起服打印 `[CFG] {...}` 一行；`GET /v1/selfcheck` 可远程核对生效参数（token 已掩码）。
 - 全零音频 + `text`：照常判院；无 `text` + mock：只回「没听清」并记 `outcome=aborted`。
 - `bye` 任何 reason 都不断连；`abort` 也落一行（成功后再打断不会重复记）。
 - 真机验收（旧板即可跑）：[`docs/accept-host-2026-11-17.md`](docs/accept-host-2026-11-17.md)。

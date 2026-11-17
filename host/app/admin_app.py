@@ -7,7 +7,7 @@ from fastapi import Body, FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from . import judge
-from .config import settings, validate_settings
+from .config import effective, settings, validate_settings
 from .metrics import tail
 from .persona import load_houses, load_lines, load_prompt
 from .preheat import run_preheat
@@ -102,6 +102,14 @@ async def metrics(req: Request, x_admin_token: str | None = Header(default=None)
         "# HELP sortinghat_ttfc_ms last session TTFC (host side)",
         f"sortinghat_ttfc_ms {lat.get('host_ms', -1)}",
     ]) + "\n"
+
+
+@admin_app.get("/v1/selfcheck")
+async def selfcheck(x_admin_token: str | None = Header(default=None)):
+    """一看就知道这一场跑的是什么参数（token 已掩码）。"""
+    _require(x_admin_token)
+    return JSONResponse({"ok": True, "effective": effective(),
+                         "halt": STATE.halt, "config_overrides": STATE.config})
 
 
 @admin_app.post("/v1/config")

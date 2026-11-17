@@ -17,8 +17,18 @@ def test_argmax():
 def test_anti_cluster_only_after_history():
     recent = ["courage", "ambition"] * 5          # len=10, last 3 = ambition,courage,ambition
     v = judge.decide("我不想再解释了", payload(courage=8, ambition=7.6),
-                     recent + ["courage", "courage", "courage"], penalty=0.85)
+                     recent + ["courage", "courage", "courage"], penalty=0.85,
+                     min_history=10)
     assert v["house"] == "ambition"
+
+
+def test_balance_is_off_by_default():
+    """演示默认：同句同果（MIN_HISTORY_FOR_BALANCE=9999，平衡不生效）。"""
+    from app.config import settings
+    assert settings.min_history_for_balance > settings.history_window
+    recent = ["courage"] * 10
+    v = judge.decide("我不想再解释了", payload(courage=9, wisdom=8), recent)
+    assert v["house"] == "courage"
 
 
 def test_no_penalty_under_min_history():

@@ -294,3 +294,45 @@ def test_abort_after_result_does_not_add_aborted_row():
     _t.sleep(0.2)
     row = tail(1)[0]
     assert row.get("outcome") != "aborted"
+
+
+def test_rescue_then_hard_cap_bye():
+    """救场句后重新计时，但整轮受硬上限约束（不能超过固件 30 s）。"""
+    import time as _t
+    old = (settings.silence_ms, settings.silence_bye_ms, settings.silence_hard_cap_ms)
+    settings.silence_ms, settings.silence_bye_ms, settings.silence_hard_cap_ms = 200, 3000, 1200
+    try:
+        with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+            ws.receive_json()
+            t0 = _t.monotonic()
+            ws.send_json({"type": "listen", "state": "start"})
+            rescues, bye_at = 0, None
+            for _ in range(400):
+                m = ws.receive()
+                if "bytes" in m:
+                    continue
+                d = json.loads(m["text"])
+                if d.get("type") == "tts" and d.get("state") == "start":
+                    rescues += 1
+                if d.get("type") == "bye":
+                    bye_at = _t.monotonic() - t0
+                    break
+        assert rescues == 1, f"expected exactly one rescue line, got {rescues}"
+        assert bye_at is not None and bye_at >= 0.9, f"bye too early: {bye_at}"
+        assert bye_at < 2.5, f"hard cap not applied: {bye_at}"
+    finally:
+        settings.silence_ms, settings.silence_bye_ms, settings.silence_hard_cap_ms = old
+
+
+def test_session_row_has_rescue_flag():
+    from app.metrics import tail
+    import time as _t
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        _run_one(ws, "我最怕输，但我更怕自己在关键时候退缩。")
+        ws.send_json({"type": "bye", "reason": "done",
+                      "dev_ts": {"t_arm": 1, "t0": 10, "t5a": 11, "t5b": 15}})
+    _t.sleep(0.2)
+    row = tail(1)[0]
+    assert row["rescue"] is False
+    assert row["ttfc_ms"] == 5

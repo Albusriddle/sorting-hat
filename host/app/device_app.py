@@ -92,7 +92,10 @@ async def voice(ws: WebSocket):
     last_text = ""
     last_speech = 0.0
     rescued = False
+    round_start = 0.0
+    rescued_round = False
     heard = asyncio.Event()
+    nonlocal_rescue = [False]
 
     def record_aborted(reason: str, text: str = "") -> None:
         if sid in recorded:
@@ -100,6 +103,7 @@ async def voice(ws: WebSocket):
         recorded.add(sid)
         record({"sid": sid, "outcome": "aborted", "reason": reason,
                 "text": text or last_text, "degrade": [reason],
+                "rescue": nonlocal_rescue[0],
                 "audio": STATE.session_audio.get(sid, {})})
 
     def flush(session_id: str, dev_ts: dict | None = None) -> None:
@@ -120,6 +124,9 @@ async def voice(ws: WebSocket):
                 # 设备打点可能早于 t0（t5b < t0），不要让负数/回绕进库
                 if 0 <= d <= settings.session_max_ms:
                     row["ttfc_ms"] = d
+                    # 救场句的 0x02 帧会先抢 t5b → 这类 TTFC 不是"宣布出声"时刻
+                    if nonlocal_rescue[0] and d < 1000:
+                        row["ttfc_suspect"] = True
                 else:
                     row["ttfc_ms"] = None
                     row["clock_skew"] = d
@@ -154,12 +161,13 @@ async def voice(ws: WebSocket):
                "scores": out["verdict"]["scores"],
                "latency": out.get("latency"),
                "degrade": out.get("degrade", []),
+               "rescue": nonlocal_rescue[0],
                "audio": STATE.session_audio.get(sid, {})}
         pending[sid] = row
         timers[sid] = asyncio.create_task(flush_later(sid))
 
     async def silence_monitor():
-        nonlocal rescued
+        nonlocal rescued, last_speech
         while not heard.is_set():
             await asyncio.sleep(0.2)
             if heard.is_set():
@@ -167,13 +175,19 @@ async def voice(ws: WebSocket):
             if not last_speech:
                 continue
             idle = time.monotonic() - last_speech
+            elapsed = time.monotonic() - round_start
             if idle >= settings.silence_ms / 1000 and not rescued:
                 rescued = True
+                nonlocal_rescue[0] = True
                 # shield：即使此时收到 speech_start，也让这一句完整发完
                 await asyncio.shield(send_tts_line("唔……你在想什么呢？"))
                 if heard.is_set():
                     return
-            if idle >= settings.silence_bye_ms / 1000:
+                last_speech = time.monotonic()   # 重锚：救场后重新给一整段，而不是只剩 8 s
+                idle = 0.0
+            # bye 双条件：空闲够久，或整轮触到硬上限（必须早于固件 30 s 超时）
+            if idle >= settings.silence_bye_ms / 1000 or \
+               elapsed >= settings.silence_hard_cap_ms / 1000:
                 await ws.send_json(protocol.bye("silence"))
                 try:
                     await ws.close()
@@ -197,9 +211,12 @@ async def voice(ws: WebSocket):
                 t.cancel()
 
     def start_silence() -> asyncio.Task:
-        nonlocal last_speech, rescued
+        nonlocal last_speech, rescued, round_start, rescued_round
         last_speech = time.monotonic()
+        round_start = time.monotonic()
         rescued = False
+        rescued_round = False
+        nonlocal_rescue[0] = False
         heard.clear()
         return asyncio.create_task(silence_monitor())
 

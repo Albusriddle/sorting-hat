@@ -6,7 +6,7 @@ import sys
 import uvicorn
 
 from .admin_app import admin_app
-from .config import settings, validate_settings
+from .config import banner, settings, validate_settings
 from .device_app import device_app
 
 
@@ -22,6 +22,7 @@ def _ssl_kwargs() -> dict:
 async def main() -> None:
     try:
         validate_settings()
+        print(banner(), flush=True)
     except ValueError as exc:
         print(f"invalid settings: {exc}", file=sys.stderr)
         raise SystemExit(2)

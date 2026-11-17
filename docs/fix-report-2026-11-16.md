@@ -183,3 +183,17 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 | 6 | 文档 8000/pull hash/历史数 | 全部同步为 12000 / 最新 main / "当时值" | 文档抽查 |
 
 回归：**52 passed**。
+
+---
+
+# 附：第六轮（2026-11-18，host 侧不依赖新固件）修复
+
+| # | 问题 | 方案 | 验证 |
+|---|---|---|---|
+| 1 | 平衡机制按"连接"累积，第 11 个判院轮次起必翻院 | `MIN_HISTORY_FOR_BALANCE` 默认 10 → **9999**（关闭，同句同果）；机制代码保留，要用就显式设 10 | `test_balance_is_off_by_default` |
+| 2 | 无法证明跑的是哪套参数 | `config.effective()` + 起服打印 `[CFG] {...}`；新增 `GET /v1/selfcheck`（token 掩码） | `test_selfcheck_masks_tokens` |
+| 3 | 救场后只剩 8 s 就被收尾 | 救场句播完**重锚** `last_speech`；同时新增 `SILENCE_HARD_CAP_MS=28000` 单轮硬上限（必须 < 固件 30 s） | `test_rescue_then_hard_cap_bye` |
+| 4 | TTFC 被救场句音频污染却无标记 | 行内新增 `rescue`；救场轮且 `ttfc<1000` 时标 `ttfc_suspect` | `test_session_row_has_rescue_flag` |
+| 5 | 无"连演 15 轮/拔网线"验收用例 | 验收单新增用例 D/E/F | 文档 |
+
+回归：**57 passed**。

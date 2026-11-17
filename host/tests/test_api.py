@@ -64,3 +64,16 @@ def test_config_does_not_pollute_state():
         STATE.config.clear()
         STATE.config.update(old_cfg)
     assert STATE.config == old_cfg
+
+
+def test_selfcheck_masks_tokens():
+    r = client.get("/v1/selfcheck", headers=H)
+    assert r.status_code == 200
+    eff = r.json()["effective"]
+    assert eff["balance_active"] is False
+    assert eff["device_token"].startswith("***")
+    assert "dev-token" not in eff["device_token"]
+
+
+def test_selfcheck_requires_token():
+    assert client.get("/v1/selfcheck").status_code == 401

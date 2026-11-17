@@ -11,7 +11,7 @@
 cd host
 export DEVICE_TOKEN=dev-token ADMIN_TOKEN=dev-token
 export SILENCE_MS=12000 SILENCE_BYE_MS=20000
-python tasks.py test          # 期望 48 passed
+python tasks.py test          # 期望 57 passed
 python tasks.py up            # 先确认旧进程已停，端口没被占
 curl -s localhost:8080/healthz
 ```
@@ -64,3 +64,39 @@ curl -s localhost:8080/healthz
 | TTFC 打印 | 无符号（会 4294966xxx） | 有符号（n/a） |
 
 **结论**：用例 A/B/C 通过 = host 修复有效；要验证 `vad_start`/`t0`/30 s，仍需重烧 main。
+
+---
+
+## 用例 D：连演 15 轮同词条（验证平衡机制已关闭）
+
+目的：确认"同一个词条永远判同一个学院"，这是 11-18 识别率报告暴露的最大缺陷。
+
+```
+1. 起服日志应出现 [CFG] {... "min_history_for_balance": 9999, "balance_active": false ...}
+2. 同一词条连说 15 次（每次都要重新唤醒）
+3. 期望：15 次 result 的 house 完全一致
+4. 反证：若第 11 轮起开始变成 courage，说明平衡机制仍开着
+   → 检查 GET /v1/selfcheck 的 effective.min_history_for_balance
+```
+
+## 用例 E：拔网线取证（交给 A 的 P0）
+
+目的：确认"帽子卡在 THINKING"是固件侧问题，不是上位机不发。
+
+```
+1. 唤醒后立刻拔掉热点（或关笔记本 Wi-Fi）
+2. 期望（上位机侧）：没有 result 发出；设备串口无 [WS-RX]
+3. 恢复网络后：
+   - 上位机：连接由设备重连，新 sid，一切正常
+   - 设备：若停在 THINKING 且无法自愈（只能按串口 b 或断电）→ 固件 P0 成立
+4. 回传：拔网前后各 10 行串口日志
+```
+
+## 用例 F：救场句不再"只剩 8 秒"
+
+```
+1. 设置 SILENCE_MS=12000 / SILENCE_BYE_MS=20000 / SILENCE_HARD_CAP_MS=28000（默认值）
+2. 只唤醒、不说话：约 12 s 听到救场句
+3. 救场句念完后再等：约 28 s（不是 20 s）才收到 bye{silence}
+4. /v1/sessions 该行应带 "rescue": true
+```
