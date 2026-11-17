@@ -336,3 +336,24 @@ def test_session_row_has_rescue_flag():
     row = tail(1)[0]
     assert row["rescue"] is False
     assert row["ttfc_ms"] == 5
+
+
+def test_two_rounds_without_bye_keep_both_rows():
+    """同连接跑两场、第一场没发 bye 也不能被第二轮覆盖（一轮一行）。"""
+    from app.metrics import tail
+    import time as _t
+
+    before = len(tail(10000))
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        r1 = _run_one(ws, "我最怕输，但我更怕自己在关键时候退缩。")
+        assert r1["house"] == "courage"
+        r2 = _run_one(ws, "我在乎身边的人，他们需要我的时候我不会缺席。")   # 第一轮未发 bye
+        assert r2["house"] == "loyalty"
+        ws.send_json({"type": "bye", "reason": "done",
+                      "dev_ts": {"t_arm": 1, "t0": 10, "t5a": 11, "t5b": 15}})
+    _t.sleep(0.3)
+    rows = [r for r in tail(10000)[before:] if r.get("house")]
+    houses = [r["house"] for r in rows]
+    assert "courage" in houses and "loyalty" in houses, houses
+    assert all("round" in r for r in rows), rows

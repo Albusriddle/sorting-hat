@@ -44,7 +44,7 @@ python tasks.py preheat      # 必须 ok:true；AWS 模式下 asr 预热会标 s
 ## 4. 测试
 
 ```bash
-python -m pytest -q            # 57 passed
+python -m pytest -q            # 60 passed
 python tasks.py up &
 python tasks.py preheat
 python tasks.py smoke          # result 应带 scores / announce

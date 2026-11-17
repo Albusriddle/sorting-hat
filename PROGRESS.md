@@ -8,7 +8,7 @@
 | 2 | 上位机网关/编排/判决/管理面/大屏 | `python tasks.py up`；`/healthz`、`/stats` |
 | 3 | 六步预热（preroll 可选） | `python tasks.py preheat` → `ok:true`，`degraded=[preroll_placeholder]` |
 | 4 | 端到端冒烟（无设备） | `python tasks.py smoke` → `house=loyalty`、`scores`、`announce` |
-| 5 | 单测 | `python tasks.py test` → **57 passed** |
+| 5 | 单测 | `python tasks.py test` → **60 passed** |
 | 6 | 设备端固件（Arduino） | `fw/设备端/firmware/sorting_hat_base/`（A 上传） |
 | 7 | 学院名双套 + 编译开关 | `gen_phrases.py` 生成；`HAT_HOUSE_ORIGINAL` 切换 |
 | 8 | 词条映射 → text 通路 | 设备 `hat_intent`；host `text` 分支；冒烟验证 |
@@ -27,7 +27,7 @@
 ```bash
 cd host
 export DEVICE_TOKEN=dev-token ADMIN_TOKEN=dev-token   # .env 不自动加载
-python tasks.py test                 # 57 passed
+python tasks.py test                 # 60 passed
 python tasks.py up                   # device :8443 / admin :8080
 python tasks.py preheat
 python tasks.py ready                # 200

@@ -77,3 +77,20 @@ def test_selfcheck_masks_tokens():
 
 def test_selfcheck_requires_token():
     assert client.get("/v1/selfcheck").status_code == 401
+
+
+def test_config_can_hot_tune_hard_cap():
+    old = settings.silence_hard_cap_ms
+    try:
+        r = client.post("/v1/config", json={"silence_hard_cap_ms": 27000}, headers=H)
+        assert r.status_code == 200
+        assert settings.silence_hard_cap_ms == 27000
+    finally:
+        settings.silence_hard_cap_ms = old
+
+
+def test_config_rejects_hard_cap_above_device_timeout():
+    old = settings.silence_hard_cap_ms
+    r = client.post("/v1/config", json={"silence_hard_cap_ms": 30000}, headers=H)
+    assert r.status_code == 400
+    assert settings.silence_hard_cap_ms == old

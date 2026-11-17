@@ -117,7 +117,7 @@ async def config(payload: dict = Body(default={}),
                  x_admin_token: str | None = Header(default=None)):
     _require(x_admin_token)
     keys = ("max_share", "recent3_penalty", "min_history_for_balance",
-            "silence_ms", "silence_bye_ms", "min_audio_rms")
+            "silence_ms", "silence_bye_ms", "silence_hard_cap_ms", "min_audio_rms")
     old = {k: getattr(settings, k) for k in keys}
     applied = {}
     try:

@@ -1,5 +1,6 @@
 
 from __future__ import annotations
+import json
 import os
 from dataclasses import dataclass
 
@@ -112,5 +113,4 @@ def effective() -> dict:
 
 
 def banner() -> str:
-    import json
     return "[CFG] " + json.dumps(effective(), ensure_ascii=False, sort_keys=True)

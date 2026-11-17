@@ -11,7 +11,7 @@
 cd host
 export DEVICE_TOKEN=dev-token ADMIN_TOKEN=dev-token
 export SILENCE_MS=12000 SILENCE_BYE_MS=20000
-python tasks.py test          # 期望 57 passed
+python tasks.py test          # 期望 60 passed
 python tasks.py up            # 先确认旧进程已停，端口没被占
 curl -s localhost:8080/healthz
 ```
@@ -72,6 +72,7 @@ curl -s localhost:8080/healthz
 目的：确认"同一个词条永远判同一个学院"，这是 11-18 识别率报告暴露的最大缺陷。
 
 ```
+0. 前提：**每说一次前必须先重新唤醒**（固件只从 OFF/ARMED 进 LISTENING；帽子念完回到 ARMED 才可再唤醒）
 1. 起服日志应出现 [CFG] {... "min_history_for_balance": 9999, "balance_active": false ...}
 2. 同一词条连说 15 次（每次都要重新唤醒）
 3. 期望：15 次 result 的 house 完全一致

@@ -4,7 +4,7 @@
 
 三层交付：`hw/`（硬件与实测）、`fw/设备端/`（下位机，ESP32-WROOM-32D + Arduino）、`host/`（上位机，Python/FastAPI）。
 
-> **现状（2026-11-17 中午）**：上位机 **52 条测试全绿**；设备端四院判院/CSK4002 出声已在真机验证，但板上仍是 `5d845bb` 旧固件（仓库 main 的 t0/`vad_start`/30 s 修复未烧）。没有麦克风/功放，真实音频链路未打通（已接受）。
+> **现状（2026-11-17 中午）**：上位机 **60 条测试全绿**；设备端四院判院/CSK4002 出声已在真机验证，但板上仍是 `5d845bb` 旧固件（仓库 main 的 t0/`vad_start`/30 s 修复未烧）。没有麦克风/功放，真实音频链路未打通（已接受）。
 
 ---
 
@@ -81,7 +81,7 @@ pip install -r requirements-audio.txt   # 可选：Opus 解码；没有就走 0x
 export DEVICE_TOKEN=dev-token
 export ADMIN_TOKEN=dev-token
 
-python tasks.py test        # 52 passed
+python tasks.py test        # 60 passed
 python tasks.py up          # device :8443 / admin :8080（admin 只绑 127.0.0.1）
 ```
 
@@ -160,7 +160,7 @@ host/
   app/               device_app, engine, judge, providers(_aws), protocol,
                      audio, opus_codec, preheat, admin_app, metrics, state, run
   persona/           houses.yaml, lines.yaml, prompt.md
-  tests/             52 条（judge/协议/引擎/WS/AWS/Opus/配置）
+  tests/             60 条（judge/协议/引擎/WS/AWS/Opus/配置）
   tasks.py           Windows 友好任务入口
 docs/                协议、providers、runbook、现状、修复报告、交接、验收单、design/（历史）
 fixtures/            回放样例
@@ -191,7 +191,7 @@ tools/               仓库自检、发布脚本
 ## 9. 测试与验收
 
 ```bash
-python -m pytest -q            # 52 passed
+python -m pytest -q            # 60 passed
 python tools/check_tree.py     # missing: none / extra: none
 python tasks.py preheat        # ok:true
 python tasks.py smoke          # result + scores + announce
@@ -215,6 +215,7 @@ python tasks.py smoke          # result + scores + announce
 | 只听到「没听清」 | `/stats.audio.rms` 是否 <50；无麦时应走 `text` |
 | `/readyz` 503 | 先 `python tasks.py preheat`，看哪个 required 步骤红 |
 | 大屏空白 | 从 `127.0.0.1:8080` 打开，或带 `X-Admin-Token` |
+| 想知道跑的是什么参数 | `curl -H "X-Admin-Token: dev-token" localhost:8080/v1/selfcheck`（token 已掩码） |
 | 看到 bye 但连接没断 | 正常：host 只在结算，不断连 |
 | 按 halt 还在跑 | `halt_new/stop_all` 只拦新 `listen`，不打断在途 |
 | 改了 env 不生效 | 先停旧进程（端口占用），再 `python tasks.py up`；`.env` 不自动加载 |

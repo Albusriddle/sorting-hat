@@ -2,12 +2,20 @@
 
 1. `cd host`，`export DEVICE_TOKEN=… ADMIN_TOKEN=…`（`.env` 不会自动加载；键名见 `.env.example`）；设备 `secrets.h` 的 `TOKEN` 与 `DEVICE_TOKEN` 一致。
 2. `pip install -r requirements.txt`（可选 `-r requirements-audio.txt`）。
-3. `python tasks.py test` → 57 passed。
+3. `python tasks.py test` → 60 passed。
 4. `python tasks.py up`（device :8443 / admin :8080）。
 5. `python tasks.py preheat` → `ok:true`；若 `degraded:["preroll_placeholder"]` 可上台（宣布句走设备 TTS）。
 6. `python tasks.py ready` → 200。
 7. `python tasks.py smoke` → 看到 `result ... announce=...`。
 8. 设备上电 → 戴上/按 `w` → 说预置台词（或按 `A-D` 模拟）→ 帽子念院名。
+
+## 开演前 30 秒自检
+
+```bash
+curl -s -H "X-Admin-Token: dev-token" localhost:8080/v1/selfcheck
+```
+
+看三件事：`silence_ms/silence_bye_ms` 是否 12000/20000、`min_history_for_balance` 是否 9999（=平衡关闭）、`llm_provider` 是不是你要的那套。
 
 ## 故障速查
 

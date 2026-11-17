@@ -2,7 +2,7 @@
 
 > 对应输入：`烧板联调问题-11-17.md`（设备端联调记录）
 > 对应提交：**`e29f38c`**（`42e50f5..e29f38c`，已推 `origin/main`）
-> 回归：第一轮 37 passed；两轮累计 43，当前 **48**（见文末第二轮）；冒烟（全零 PCM + text）`house=loyalty`；8 秒计时观察 PASS
+> 回归：第一轮 37 passed（历史值）；**最新以文末最后一轮为准**；冒烟（全零 PCM + text）`house=loyalty`；8 秒计时观察 PASS
 
 ## 0. 结论
 
@@ -197,3 +197,19 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 | 5 | 无"连演 15 轮/拔网线"验收用例 | 验收单新增用例 D/E/F | 文档 |
 
 回归：**57 passed**。
+
+---
+
+# 附：第七轮（2026-11-18，全仓审阅后）修复
+
+| # | 级别 | 问题 | 方案 | 验证 |
+|---|---|---|---|---|
+| 1 | 高 | README 三处仍写 52/57 条测试 | 全部改 **60**；README/PROGRESS/providers/runbook/验收单同步 | 文档抽查 |
+| 2 | 中 | `pending`/`timers` 以 sid 为键，同连接第二场会覆盖第一场 | 键改 `(sid#轮次)`，`new_round()` 每轮递增；`_collect` 绑定当轮键 | `test_two_rounds_without_bye_keep_both_rows` |
+| 3 | 中 | `/v1/config` 不含 `silence_hard_cap_ms` | 加进允许键（校验已限 ≤29000） | `test_config_can_hot_tune_hard_cap`、`test_config_rejects_hard_cap_above_device_timeout` |
+| 4 | 低 | `rescued_round` 死代码 + `nonlocal_rescue` 列表当变量 | 删列表，统一 `nonlocal rescued_round` | 代码审查 |
+| 5 | 低 | `ttfc_suspect` 与 `clock_skew` 语义分裂 | 救场轮统一标 `ttfc_suspect`，负值仍记 `clock_skew` | 代码审查 |
+| 6 | 低 | `banner()` 函数内 import json | 提到模块顶部 | 起服横幅实测 |
+| 7 | 中 | handoff 未提硬上限；runbook 无 selfcheck | 两处补齐 | 文档 |
+
+回归：**60 passed**；起服 `[CFG]` 与 `/v1/selfcheck` 实测通过。
