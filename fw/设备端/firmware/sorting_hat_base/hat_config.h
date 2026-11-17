@@ -57,9 +57,9 @@
 
 // ---------------- 时间参数 ----------------
 #define LISTEN_TIMEOUT_MS   30000UL  // 进 LISTENING 后多久没说完算超时
-                                     // 搭配上位机 SILENCE_MS=15000 / SILENCE_BYE_MS=20000 使用：
-                                     // 15s 才发救场句（避免帽子插嘴盖住观众），20s 上位机先 bye，
-                                     // 本值留到 25s 兜底，正常不会触发
+                                     // 搭配上位机 SILENCE_MS=12000 / SILENCE_BYE_MS=20000 使用：
+                                     // 12s 才发救场句（盖住"慢说 + 唤醒后停顿"），20s 上位机先 bye，
+                                     // 本值留到 30s 兜底，正常不会触发
 #define OFFLINE_MS          4000UL   // WS 断线多久提示"断网"
 #define RECONNECT_MS        1500UL   // 重连间隔
 #define HEARTBEAT_MS        15000UL  // ping 间隔
