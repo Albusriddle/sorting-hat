@@ -66,3 +66,11 @@ def validate_settings(s: Settings | None = None) -> None:
     if s.silence_bye_ms < s.silence_ms + 5000:
         raise ValueError(
             f"SILENCE_BYE_MS({s.silence_bye_ms}) must be >= SILENCE_MS({s.silence_ms}) + 5000")
+    if not 0 <= s.min_audio_rms <= 10000:
+        raise ValueError("MIN_AUDIO_RMS must be in [0, 10000]")
+    if not 0 < s.max_share <= 1:
+        raise ValueError("MAX_SHARE must be in (0, 1]")
+    if not 0 < s.recent3_penalty <= 1:
+        raise ValueError("RECENT3_PENALTY must be in (0, 1]")
+    if s.history_window <= 0 or s.min_history_for_balance <= 0:
+        raise ValueError("HISTORY_WINDOW / MIN_HISTORY_FOR_BALANCE must be > 0")

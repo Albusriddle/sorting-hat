@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 from app.admin_app import admin_app
 from app.config import settings
+from app.state import STATE
 
 client = TestClient(admin_app)
 H = {"X-Admin-Token": settings.admin_token}
@@ -44,3 +45,22 @@ def test_config_applies_valid_pair():
         assert settings.silence_ms == 12000 and settings.silence_bye_ms == 20000
     finally:
         settings.silence_ms, settings.silence_bye_ms = old
+
+
+def test_config_rejects_out_of_range_rms():
+    old = settings.min_audio_rms
+    r = client.post("/v1/config", json={"min_audio_rms": -1}, headers=H)
+    assert r.status_code == 400
+    assert settings.min_audio_rms == old
+
+
+def test_config_does_not_pollute_state():
+    old_cfg = dict(STATE.config)
+    old = (settings.silence_ms, settings.silence_bye_ms)
+    try:
+        client.post("/v1/config", json={"silence_ms": 12000, "silence_bye_ms": 20000}, headers=H)
+    finally:
+        settings.silence_ms, settings.silence_bye_ms = old
+        STATE.config.clear()
+        STATE.config.update(old_cfg)
+    assert STATE.config == old_cfg

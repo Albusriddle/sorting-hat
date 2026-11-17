@@ -257,3 +257,40 @@ def test_bye_timeout_keeps_connection():
         ws.send_json({"type": "bye", "reason": "timeout"})
         r2 = _run_one(ws, "我喜欢把一件事拆开想清楚，再决定要不要做。")
         assert r2["house"] == "wisdom"
+
+
+def test_dev_ts_can_arrive_after_two_seconds():
+    """设备念院名可能 >2 s 才发 bye{done}；TTFC 不应因此丢失。"""
+    from app.metrics import tail
+    import time as _t
+
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        r = _run_one(ws, "我在乎身边的人，他们需要我的时候我不会缺席。")
+        assert r["house"] == "loyalty"
+        _t.sleep(2.5)                       # 模拟 CSK4002 念院名
+        ws.send_json({"type": "bye", "reason": "done",
+                      "dev_ts": {"t_arm": 1, "t0": 10, "t5a": 11, "t5b": 15}})
+    _t.sleep(0.2)
+    row = tail(1)[0]
+    assert row["ttfc_ms"] == 5
+
+
+def test_abort_after_result_does_not_add_aborted_row():
+    """成功后再按打断，不应再写一条 aborted（联调双行问题）。"""
+    from app.metrics import tail
+    import time as _t
+
+    with client.websocket_connect(URL, subprotocols=["sortinghat.voice.v1"]) as ws:
+        ws.receive_json()
+        _run_one(ws, "我最怕输，但我更怕自己在关键时候退缩。")
+        ws.send_json({"type": "abort", "reason": "button"})
+        for _ in range(20):
+            m = ws.receive()
+            if "bytes" in m:
+                continue
+            if json.loads(m["text"]).get("type") == "bye":
+                break
+    _t.sleep(0.2)
+    row = tail(1)[0]
+    assert row.get("outcome") != "aborted"

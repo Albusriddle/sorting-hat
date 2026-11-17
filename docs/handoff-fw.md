@@ -87,7 +87,7 @@ host 侧对应检查：`/stats` 有 `last.text`；`/v1/sessions` 有 `ttfc_ms`�
 
 | 问题 | 修法 | 端 |
 |---|---|---|
-| 静音救场吞话 | `SILENCE_MS` 默认 **8000**、`SILENCE_BYE_MS` **20000**；识别到词条时设备补发 `vad{speech_start}`，host 收到即**取消**计时 | host + 固件 |
+| 静音救场吞话 | `SILENCE_MS` 默认 **12000**、`SILENCE_BYE_MS` **20000**；识别到词条时设备补发 `vad{speech_start}`，host 收到即**停止**计时（置事件，不打断正在发的句子） | host + 固件 |
 | 超时断线重连 | host 收到任何 `bye` 都只结算本轮、**不断连**；断开只由 socket 关闭决定 | host |
 | TTFC 负数/回绕 | 设备 `t0` 改到 `comm_send_vad_end()` **之前**打点；host 只接受 `0 ≤ 差值 ≤ 120 s`，否则记 `clock_skew` 并置 `None`；设备打印改有符号 | host + 固件 |
 | 两个静音参数撞车 | 启动校验 `SILENCE_BYE_MS >= SILENCE_MS + 5000`，不满足拒绝启动 | host |

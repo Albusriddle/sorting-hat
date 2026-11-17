@@ -88,12 +88,16 @@ async def voice(ws: WebSocket):
     watchdog: asyncio.Task | None = None
     pending: dict[str, dict] = {}
     timers: dict[str, asyncio.Task] = {}
+    recorded: set[str] = set()
     last_text = ""
     last_speech = 0.0
     rescued = False
     heard = asyncio.Event()
 
     def record_aborted(reason: str, text: str = "") -> None:
+        if sid in recorded:
+            return
+        recorded.add(sid)
         record({"sid": sid, "outcome": "aborted", "reason": reason,
                 "text": text or last_text, "degrade": [reason],
                 "audio": STATE.session_audio.get(sid, {})})
@@ -105,6 +109,7 @@ async def voice(ws: WebSocket):
             timer.cancel()
         if not row:
             return
+        recorded.add(session_id)
         if dev_ts:
             t0 = dev_ts.get("t0")
             t5a = dev_ts.get("t5a", t0)
@@ -122,7 +127,7 @@ async def voice(ws: WebSocket):
             row["dev_ts"] = dev_ts
         record(row)
 
-    async def flush_later(session_id: str, delay: float = 2.0) -> None:
+    async def flush_later(session_id: str, delay: float = 10.0) -> None:
         await asyncio.sleep(delay)
         flush(session_id)
 
@@ -178,8 +183,7 @@ async def voice(ws: WebSocket):
 
     async def session_watchdog():
         await asyncio.sleep(settings.session_max_ms / 1000)
-        if task and not task.done():
-            task.cancel()                       # 先停引擎，避免关闭后还写 socket
+        await cancel(silence_task, task)        # 先停计时/引擎，避免关闭后还写 socket
         record_aborted("timeout")
         try:
             await ws.send_json(protocol.bye("timeout"))
@@ -216,6 +220,7 @@ async def voice(ws: WebSocket):
                         await ws.send_json(protocol.error("rate_limited", "halt", False))
                         continue
                     last_text = ""
+                    recorded.discard(sid)          # 新一轮允许再记一行
                     audio.reset()
                     async with tts_lock:            # 等上一句发完，避免旧救场句串到新会话
                         await cancel(silence_task, watchdog)

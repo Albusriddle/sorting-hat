@@ -4,7 +4,7 @@
 
 三层交付：`hw/`（硬件与实测）、`fw/设备端/`（下位机，ESP32-WROOM-32D + Arduino）、`host/`（上位机，Python/FastAPI）。
 
-> **现状（2026-11-17）**：控制面闭环、判词由「词条文本」驱动；没有麦克风/功放，真实音频链路未打通（已接受）。设备端已完成 ASR 词条识别、四院判院与 CSK4002 出声；上位机 48 条测试全绿。详见 [修复报告](docs/fix-report-2026-11-16.md)。
+> **现状（2026-11-17 中午）**：上位机 **52 条测试全绿**；设备端四院判院/CSK4002 出声已在真机验证，但板上仍是 `5d845bb` 旧固件（仓库 main 的 t0/`vad_start`/30 s 修复未烧）。没有麦克风/功放，真实音频链路未打通（已接受）。
 
 ---
 
@@ -13,14 +13,16 @@
 | 能做 | 说明 |
 |---|---|
 | 连上云端完成一次会话 | 设备 → 笔记本 `ws://…:8443/v1/voice`，60–90 秒 |
-| 按「观众说的话」判院 | 设备把关键词编号映射成预置台词（`text`），host 优先用它，不再调 ASR |
+| 按「观众说的话」判院 | LD3320A 识别关键词编号 → 设备发预置台词 `text`；host 优先用它，不调 ASR |
 | 四院 + 三条理由 | `house` 由代码 `argmax` 产生；理由必须是观众原话 |
 | 帽子开口 | host 下发桥接句（`tts.text`），设备用 CSK4002 念；院名由设备本地念 |
-| 兜底 | host：8 s 救场 / 20 s 收尾；设备：30 s 监听超时、断网离线、按钮轮换四院 |
-| 观测 | 每次会话（含失败轮次）落 `host/var/sessions.jsonl`，含文本/学院/分数/延迟/`ttfc_ms`/`clock_skew` |
+| 兜底 | host：12 s 救场 / 20 s 收尾；设备：30 s 监听超时、断网离线、按钮轮换四院 |
+| 观测 | 每次会话（含失败/打断）落 `host/var/sessions.jsonl`，含文本/学院/分数/`ttfc_ms`/`clock_skew`/`outcome` |
 | 两种 provider | 默认 mock（零成本）；可切 AWS（Transcribe + Bedrock + Polly） |
 
 **不能做**（已接受）：自由说话转文字（无麦）、把云端 TTS 音频从帽子喇叭放出来（无功放）、全双工打断、TLS（现场内网，留 `REQUIRE_TLS` 开关）。
+
+**硬件能力边界**：LD3320A 是命令词芯片，不是麦克风阵列——**要慢说、唤醒后停 1–2 秒、只说短句**；帽子说话时它仍在听（半双工是假的），观众此时别说话。
 
 ---
 
@@ -59,9 +61,10 @@
 | 语音识别 | 幻尔 **LD3320A**（0x79） | Wire SDA16 / SCL17，100 kHz | 离线关键词 → 1 字节编号；不转文字、不出音频 |
 | 语音合成 | 幻尔 **XFS5152 / CSK4002**（0x40） | Wire1 SDA19 / SCL18，10 kHz | 合成任意 GBK/UTF-8 文本；板载喇叭 |
 | 麦克风 / 功放 | **无**（INMP441、MAX98357A 未采购） | — | 上行只能是全零帧；`0x02` 下行不外放 |
-| 按键 | 板载 BOOT（GPIO0） | — | 短按开始/打断，长按 2 s 重连/退出离线 |
+| 按键 / 灯 | **无** | — | 串口命令代用；`[LED]` 只是打印 |
 
-引脚、编译开关与冲突见 [`hw/pinmap.md`](hw/pinmap.md)；物料见 [`hw/bom.csv`](hw/bom.csv)；实测目录 [`hw/measurements/`](hw/measurements/README.md) **目前为空（全部待测）**。
+ESP32-S3 因 5V 带不动两模块已停用；烧录速率用 **115200**（921600 会 `chip stopped responding`）。
+引脚/地址/冲突见 [`hw/pinmap.md`](hw/pinmap.md)；物料见 [`hw/bom.csv`](hw/bom.csv)；实测目录 [`hw/measurements/`](hw/measurements/README.md) **目前为空（全部待测）**。
 
 ---
 
@@ -78,7 +81,7 @@ pip install -r requirements-audio.txt   # 可选：Opus 解码；没有就走 0x
 export DEVICE_TOKEN=dev-token
 export ADMIN_TOKEN=dev-token
 
-python tasks.py test        # 48 passed
+python tasks.py test        # 52 passed
 python tasks.py up          # device :8443 / admin :8080（admin 只绑 127.0.0.1）
 ```
 
@@ -101,7 +104,7 @@ result: loyalty ['我在乎身边的人'] ... scores={'loyalty': 11.0} announce=
 ```
 
 > - **`make`**：macOS/Linux 可用 `make test / up / preheat / smoke`；Windows 用 `python tasks.py`。
-> - **`.env` 不会自动加载**：`host/.env.example` 只是键名清单，请 `export` 注入；行内注释不要保留在数值行（`source` 会把它读进值里）。
+> - **`.env` 不会自动加载**：`host/.env.example` 只是键名清单，请 `export` 注入；数值行不要带行内注释。
 > - **`tasks.py`** 的管理面 token 读 `ADMIN_TOKEN`（默认 `dev-token`）。
 
 ---
@@ -114,12 +117,14 @@ result: loyalty ['我在乎身边的人'] ... scores={'loyalty': 11.0} announce=
 |---|---|---|
 | `HAT_ENABLE_MIC/SPK/LED/BTN/OPUS/VAD` | 全关 | 实物没有对应外设 |
 | `HAT_HOUSE_ORIGINAL` | `0` | 0=赤翎/玄渊/星枢/穗垣；1=哈利波特原名 |
-| `ASR_WAKE_WORD_ID` | `5` | 1–4 号留给四句内容，5 号唤醒 |
+| `ASR_WAKE_WORD_ID` | `5` | 1–4 号四句内容，5 号唤醒 |
 | `LISTEN_TIMEOUT_MS` | `30000` | 晚于 host 的 20 s 收尾 |
 
-串口 115200：`w` 唤醒、`e` 说完、`b` 打断、`x` 故障、`o` 离线、`k` 能量、`a/1-4` 试听、`p` 词条表、`A-D` 模拟识别 1–4 号。
+串口 115200：`w` 唤醒、`e` 说完、`b` 打断、`x` 故障、`o` 离线、`k` 能量、`a/1-4` 试听、`p` 词条表、`A-D` 模拟识别 1–4 号、大写 `P` 重写词条。
 
-**2026-11-17 行为**：`t0` 在 `vad_end` 之前打点；识别到词条补发 `vad{speech_start}`（host 停表）；`tts{stop}` 不硬停合成；时间戳有符号打印。详见 [`fw/README.md`](fw/README.md)。
+**词条表（实烧短拼音）**：`kai shi`（5，唤醒）/ `wo pa shu`（1）/ `wo yao de hen da`（2）/ `wo xi huan chai kai xiang`（3）/ `wo zai hu shen bian`（4）。1–4 的词条与 intent 长句是**映射关系**，不要重烧已验过的 4 条。
+
+**11-17 仓库行为**：`t0` 在 `vad_end` 之前打点；识别到词条补发 `vad{speech_start}`（host 停表）；`tts{stop}` 不硬停合成；时间戳有符号打印；超时 30 s。**板上若还是 5d845bb，这些都没有。**
 
 烧板清单与回传日志见 [`docs/handoff-fw.md`](docs/handoff-fw.md)。
 
@@ -155,9 +160,9 @@ host/
   app/               device_app, engine, judge, providers(_aws), protocol,
                      audio, opus_codec, preheat, admin_app, metrics, state, run
   persona/           houses.yaml, lines.yaml, prompt.md
-  tests/             48 条（judge/协议/引擎/WS/AWS/Opus/配置）
+  tests/             52 条（judge/协议/引擎/WS/AWS/Opus/配置）
   tasks.py           Windows 友好任务入口
-docs/                协议、providers、runbook、现状、修复报告、handoff、design/（历史）
+docs/                协议、providers、runbook、现状、修复报告、交接、验收单、design/（历史）
 fixtures/            回放样例
 release/             提交物
 tools/               仓库自检、发布脚本
@@ -179,14 +184,14 @@ tools/               仓库自检、发布脚本
 | `TTS_PACE_MS` | `60` | 下行帧节拍；测试置 0 |
 | `REQUIRE_TLS` / `TLS_CERT` / `TLS_KEY` | `0` / 空 | 开 TLS 时缺证书拒绝启动 |
 
-完整键见 [`host/.env.example`](host/.env.example)。
+完整键见 [`host/.env.example`](host/.env.example)。`/v1/config` 运行时改参会先校验，失败回滚并 400。
 
 ---
 
 ## 9. 测试与验收
 
 ```bash
-python -m pytest -q            # 48 passed
+python -m pytest -q            # 52 passed
 python tools/check_tree.py     # missing: none / extra: none
 python tasks.py preheat        # ok:true
 python tasks.py smoke          # result + scores + announce
@@ -194,8 +199,8 @@ python tasks.py smoke          # result + scores + announce
 
 - 判决纯函数；空 evidence / 全零分 → `insufficient`，不判院。
 - 全零音频 + `text`：照常判院；无 `text` + mock：只回「没听清」并记 `outcome=aborted`。
-- `bye` 任何 reason 都不断连（可同连接连演多场）。
-- 会话记录含 `text/house/scores/latency/ttfc_ms/clock_skew/audio.rms/outcome`。
+- `bye` 任何 reason 都不断连；`abort` 也落一行（成功后再打断不会重复记）。
+- 真机验收（旧板即可跑）：[`docs/accept-host-2026-11-17.md`](docs/accept-host-2026-11-17.md)。
 
 ---
 
@@ -211,6 +216,7 @@ python tasks.py smoke          # result + scores + announce
 | 看到 bye 但连接没断 | 正常：host 只在结算，不断连 |
 | 按 halt 还在跑 | `halt_new/stop_all` 只拦新 `listen`，不打断在途 |
 | 改了 env 不生效 | 先停旧进程（端口占用），再 `python tasks.py up`；`.env` 不自动加载 |
+| 观众说一半帽子插嘴 | `SILENCE_MS` 是否被改成 8 s；默认应为 12 s |
 
 更多：[`docs/runbook.md`](docs/runbook.md)。
 
@@ -223,20 +229,23 @@ python tasks.py smoke          # result + scores + announce
 3. 明文 `ws://`：现场热点内网；`REQUIRE_TLS` 可切 wss。
 4. 12 句预录为**可选**（设备 TTS 直接念院名）；`preheat` 会显示 `degraded=preroll_placeholder`。
 5. 未验证：Opus/VAD 真机、AWS 三件套实调、设备端编译（本机无 Arduino 工具链）。
+6. 半双工是假的：帽子说话时 LD3320A 仍听，靠主持脚本规避。
 
 ## 12. 下一步
 
-- [ ] 烧板验证：`t0` 提前、`vad_start`、30 s 超时、`tts{stop}` 不硬停
+- [ ] 烧仓库 main 固件：`t0` 提前、`vad_start`、30 s、有符号打印
+- [ ] A 按验收单跑旧板三用例（text / 12 s 静音 / TTFC 兼容）
+- [ ] 用真嘴测 20 次/句识别率，<90% 就缩短词条
 - [ ] AWS 凭证接通，`preheat` 全绿
-- [ ] 若加麦：把 `0x04` 换成真 PCM，启用 Transcribe
-- [ ] 彩排 3 次，11/18 前提交 v2
+- [ ] 彩排 3 次，11/18 15:00 冻结
 
 ## 13. 文档
 
 | 文档 | 内容 |
 |---|---|
-| [docs/fix-report-2026-11-16.md](docs/fix-report-2026-11-16.md) | 两轮修复报告（烧板联调 + 交接说明） |
-| [docs/handoff-fw.md](docs/handoff-fw.md) | 给下位机/硬件侧的工作报告（烧板清单） |
+| [docs/fix-report-2026-11-16.md](docs/fix-report-2026-11-16.md) | 五轮修复报告 |
+| [docs/accept-host-2026-11-17.md](docs/accept-host-2026-11-17.md) | 旧板即可跑的 host 验收单 |
+| [docs/handoff-fw.md](docs/handoff-fw.md) | 给下位机/硬件侧的交接（烧板清单） |
 | [docs/00-protocol.md](docs/00-protocol.md) | 协议现状（消息/帧/时间戳/bye 语义） |
 | [docs/providers.md](docs/providers.md) | mock ↔ AWS 切换 |
 | [docs/runbook.md](docs/runbook.md) | 上台手册与故障速查 |

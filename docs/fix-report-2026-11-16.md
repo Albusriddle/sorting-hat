@@ -119,7 +119,7 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 1. 重烧 F5（`tts{stop}` 不硬停）；
 2. 删除 ±121 底噪绕过；
 3. 复测：`w → A → e` 出 `result`；静音 6.5 s 救场句完整；失败一轮后 20 s 无 `bye`；
-4. 若使用副本 `D:\学习区\分院帽\sorting-hat-main`，`git pull` 到 `e29f38c` 再测。
+4. 若使用副本 `D:\学习区\分院帽\sorting-hat-main`，`git pull origin main` 到最新（至少 `09a7d45` 之后）再测。
 
 ---
 
@@ -127,7 +127,7 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 
 | # | 问题 | 方案 | 端 | 验证 |
 |---|---|---|---|---|
-| 1 | 静音救场吞话 | `SILENCE_MS` 8000 / `SILENCE_BYE_MS` 20000；识别到词条时发 `vad{speech_start}`，host 收到即取消计时 | host + 固件 | 单测 + 代码审查 |
+| 1 | 静音救场吞话 | `SILENCE_MS` 12000 / `SILENCE_BYE_MS` 20000；识别到词条时发 `vad{speech_start}`，host 收到即取消计时 | host + 固件 | 单测 + 代码审查 |
 | 2 | 超时断线重连 | `bye` 任何 reason 都只结算、不断连 | host | `test_bye_silence_keeps_connection` |
 | 3 | TTFC 负数/回绕 | 设备 `t0` 提前打点；host 只接受 `0≤差值≤120s`，否则 `None` + `clock_skew`；设备改有符号打印 | host + 固件 | `test_ttfc_is_none_when_device_clock_backwards` |
 | 4 | 两个静音参数撞车 | 启动校验 `bye ≥ silence+5000`，不满足退出码 2 | host | `test_config.py` 3 条 |
@@ -151,7 +151,7 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 | 5 | aborted 行缺文本 | `record_aborted(reason, text)` | 代码审查 |
 | 6 | providers/runbook 34、runbook/PROGRESS 的 `.env` | 改 44、改 export | 文档抽查 |
 
-回归：**44 passed**。
+回归：**44 passed**（当时值）。
 
 
 ---
@@ -167,3 +167,19 @@ smoke（全零 PCM + text）    → ready ... out=pcm16/16k/60ms
 | 5 | 真机验收口径缺失 | 新增 `docs/accept-host-2026-11-17.md`（旧板可直接跑） | 文档 |
 
 回归：**48 passed**。
+
+
+---
+
+# 附：第五轮（2026-11-17 中午，全仓审阅后）修复
+
+| # | 问题 | 方案 | 验证 |
+|---|---|---|---|
+| 1 | 设备念院名 >2 s 时 TTFC 丢失 | `flush_later` 延迟 2 s → **10 s**，`bye{done}` 仍立即落库 | `test_dev_ts_can_arrive_after_two_seconds` |
+| 2 | 成功后按打断会多一条 aborted | 按 sid 记 `recorded`，已记过则跳过；新一轮 `listen` 清除 | `test_abort_after_result_does_not_add_aborted_row` |
+| 3 | `/v1/config` 只校验 silence | `validate_settings` 补 `min_audio_rms/max_share/recent3_penalty/history_*` 范围 | `test_config_rejects_out_of_range_rms` |
+| 4 | 配置测试污染 `STATE.config` | 测试保存/恢复；endpoint 仍是"先校验后写 STATE" | `test_config_does_not_pollute_state` |
+| 5 | watchdog 只取消引擎 | 先 `cancel(silence_task, task)` 再关闭 | 代码审查 |
+| 6 | 文档 8000/pull hash/历史数 | 全部同步为 12000 / 最新 main / "当时值" | 文档抽查 |
+
+回归：**52 passed**。
