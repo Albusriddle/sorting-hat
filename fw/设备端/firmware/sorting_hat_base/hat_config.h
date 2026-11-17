@@ -1,19 +1,14 @@
 // ============================================================
-// hat_config.h —— 所有"可调的东西"集中在这一个文件
+// hat_config.h —— 所有可调参数集中在这
 //
-// 引脚以组长驱动代码为准（不是 pinmap.md）：
-//   ASR  Wire   SDA 16 / SCL 17   100 kHz
-//   TTS  Wire1  SDA 19 / SCL 18    10 kHz（芯片要求 ≤15 kHz）
-// 麦克风/喇叭/灯/按钮来自仓库 hw/pinmap.md（FROZEN G1 PENDING）
+// 引脚以组长驱动为准：ASR Wire SDA16/SCL17 @100k，TTS Wire1 SDA19/SCL18 @10k。
+// 麦克风/喇叭/灯/按钮来自 hw/pinmap.md。
 // ============================================================
 #pragma once
 
 #include <Arduino.h>
 
-// ============================================================
-// 编译开关：板子没到之前先关掉，代码照样能编译
-// 板上验证通过后再逐个打开
-// ============================================================
+// 编译开关：板上没有的外设就保持注释，代码照样能编能跑
 // #define HAT_ENABLE_MIC      // INMP441 麦克风（I2S 输入）
 // #define HAT_ENABLE_SPK      // MAX98357A 喇叭（I2S 输出）
 // #define HAT_ENABLE_LED      // WS2812 灯环
@@ -21,21 +16,21 @@
 // #define HAT_ENABLE_OPUS     // Opus 编解码（需要 arduino-audio-tools）
 // #define HAT_ENABLE_VAD      // 麦克风能量 VAD（依赖 HAT_ENABLE_MIC）
 
-// ---------------- 学院命名（S-05）----------------
+// ---------------- 学院命名 ----------------
 // 0 = 原创名（赤翎/玄渊/星枢/穗垣，IP 安全）
-// 1 = 哈利波特原名（格兰芬多/...，辨识度高但有版权风险）
+// 1 = 哈利波特原名（辨识度高但有版权风险）
 #define HAT_HOUSE_ORIGINAL   0
 
-// 唤醒词占用 5 号词条；1–4 号留给四句内容（S-08）
+// 唤醒词占 5 号词条；1–4 号留给四句内容
 #define ASR_WAKE_WORD_ID     5
 
-// ---------------- I2C 模块（组长驱动，已可用）----------------
+// ---------------- I2C 模块 ----------------
 #define PIN_ASR_SDA      16
 #define PIN_ASR_SCL      17
 #define PIN_TTS_SDA      19
 #define PIN_TTS_SCL      18
 
-// ---------------- I2S / 外设引脚（来自 hw/pinmap.md）----------------
+// ---------------- I2S / 外设引脚 ----------------
 #define PIN_MIC_BCLK     4      // INMP441 SCK
 #define PIN_MIC_WS       5      // INMP441 WS
 #define PIN_MIC_SD       6      // INMP441 SD
@@ -45,8 +40,7 @@
 #define PIN_LED          48     // WS2812 ×8
 #define PIN_BTN          0      // 按钮（短按=打断，长按 2 s=静音）
 
-// 已废弃：GPIO10 = 原"戴上帽子"传感器，动作取消，不用了
-// 本项目不接：GPIO1(电池 ADC) / GPIO2(马达) / GPIO3(电源使能)
+// 已废弃：GPIO10 原"戴上帽子"传感器；GPIO1/2/3 本项目不接
 
 // ---------------- 音频参数（和上位机对齐，别改）----------------
 #define AUDIO_HZ          16000   // 上行 16 kHz
@@ -56,16 +50,16 @@
 #define OPUS_COMPLEXITY   5       // 0–10，S3 上 5 大约占 30–50% CPU；C3 要降到 1
 
 // ---------------- 时间参数 ----------------
-#define LISTEN_TIMEOUT_MS   30000UL  // 进 LISTENING 后多久没说完算超时
-                                     // 搭配上位机 SILENCE_MS=12000 / SILENCE_BYE_MS=20000 使用：
-                                     // 12s 才发救场句（盖住"慢说 + 唤醒后停顿"），20s 上位机先 bye，
-                                     // 本值留到 30s 兜底，正常不会触发
+#define LISTEN_TIMEOUT_MS   30000UL  // 兜底：上位机 12 s 发救场句、20 s 先 bye，正常走不到这
 #define OFFLINE_MS          4000UL   // WS 断线多久提示"断网"
+// 断网时上位机不回任何消息，没有这个兜底只能断电；
+// 只在主机一字未回（t5a==0）时计，收到 tts start 就交给主机
+#define THINKING_TIMEOUT_MS 22000UL
 #define RECONNECT_MS        1500UL   // 重连间隔
 #define HEARTBEAT_MS        15000UL  // ping 间隔
 
 // ---------------- VAD 参数 ----------------
 #define VAD_TAIL_MS         300       // 连续静音多久算"说完了"（与 ready.vad.tail_ms 对齐）
 #define VAD_MIN_SPEECH_MS   200       // 至少说了多久才算一次有效发言（与 ready.vad.min_speech_ms 对齐）
-#define VAD_ENERGY_THRESH   600       // 能量阈值（16 bit PCM，绝对值平均）。安静时约 20–200，说话 1000+
-#define VAD_DEBOUNCE_MS     40        // 防抖：连续多久超过阈值才认定"开始说话"
+#define VAD_ENERGY_THRESH   600       // 能量阈值（16 bit PCM 绝对值平均）。安静 20–200，说话 1000+
+#define VAD_DEBOUNCE_MS     40        // 连续超阈值多久才认定"开始说话"

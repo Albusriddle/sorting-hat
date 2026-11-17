@@ -28,7 +28,7 @@ void hat_go(HatState next, const char* event) {
   Serial.printf("[LED] %s\n", hat_state_led(next));
   hw_led_set((int)next);
 
-  // 离开 SPEAKING 时立刻停播放（打断、超时、出错都走这里）
+  // 离开 SPEAKING 立刻停播放（打断、超时、出错都走这）
   if (next != HatState::SPEAKING) hw_speaker_stop();
 }
 
@@ -40,7 +40,7 @@ void hat_ts_stamp(uint32_t HatTs::*field) {
 }
 
 void hat_ts_reset() {
-  g_ts.tArm = millis();          // 进入 LISTENING 时记录起点
+  g_ts.tArm = millis();          // 进 LISTENING 时记起点
   g_ts.t0 = g_ts.t5a = g_ts.t5b = g_ts.tStop = 0;
 }
 
@@ -50,7 +50,7 @@ void hat_ts_dump() {
                 (unsigned long)g_ts.tArm, (unsigned long)g_ts.t0,
                 (unsigned long)g_ts.t5a, (unsigned long)g_ts.t5b,
                 (unsigned long)g_ts.tStop);
-  // 设备打点可能早于 t0（WS 发送与下行竞争），无符号相减会变成 2^32-差值
+  // 打点可能早于 t0（WS 发送和下行竞争），无符号相减会溢出成 2^32-差值
   if (g_ts.t5a && t0) {
     int32_t d = (int32_t)(g_ts.t5a - t0);
     if (d >= 0) Serial.printf("[TS] TTFV=%ld ms\n", (long)d);

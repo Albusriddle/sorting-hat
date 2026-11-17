@@ -15,7 +15,7 @@ static uint32_t s_speechStartAt = 0;
 static uint32_t s_silenceSince  = 0;
 static uint32_t s_voiceSince    = 0;
 
-// 每 20 ms 一帧，用 millis() 控制节奏，避免读得太快把 DMA 抽干
+// 每 20 ms 一帧，用 millis() 卡节奏，防读太快抽干 DMA
 static uint32_t s_nextFrameAt = 0;
 
 static int32_t frame_energy(const int16_t* pcm, size_t n) {
@@ -48,7 +48,7 @@ void mic_pump_frame() {
   int16_t buf[AUDIO_SAMPLES];
   size_t n = hw_mic_read(buf, AUDIO_SAMPLES);
 
-  // 没开 VAD 时，真实麦克风的数据照样发出去（服务端自己判 VAD）
+  // 没开 VAD 时真实麦克风数据照发，由服务端判 VAD
   if (n > 0) comm_send_audio(buf, n);
 
 #ifndef HAT_ENABLE_VAD
@@ -81,7 +81,7 @@ void mic_loop(bool* vadStarted, bool* vadEnded) {
   bool loud = (e > VAD_ENERGY_THRESH);
 
   if (!s_speechActive) {
-    // 等待起振：连续 VAD_DEBOUNCE_MS 超过阈值才认
+    // 起振：连续 VAD_DEBOUNCE_MS 超阈值才算
     if (loud) {
       if (!s_voiceSince) s_voiceSince = now;
       if (now - s_voiceSince >= VAD_DEBOUNCE_MS) {
@@ -95,7 +95,7 @@ void mic_loop(bool* vadStarted, bool* vadEnded) {
       s_voiceSince = 0;
     }
   } else {
-    // 已说话：连续 VAD_TAIL_MS 静音 → 说完
+    // 已开口：连续 VAD_TAIL_MS 静音就算说完
     if (loud) {
       s_silenceSince = 0;
     } else {

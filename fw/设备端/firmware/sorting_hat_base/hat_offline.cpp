@@ -10,14 +10,13 @@
 
 extern voice::XFS5152 tts;
 
-static bool     s_netUp    = true;    // 上电默认假设有网，避免一直连不上时立刻进入离线
+static bool     s_netUp    = true;    // 上电先假定有网，免得连不上时一上来就离线
 static bool     s_active   = false;
 static bool     s_announced = false;
 static uint8_t  s_houseIdx = 0;
 static uint32_t s_offlineSince = 0;
 
-// 与 persona/houses.yaml 同序：courage / ambition / wisdom / loyalty
-// 与 hat_comm.cpp 的 speak_house 用同一套宏，跟着 HAT_HOUSE_ORIGINAL 切换
+// 与 houses.yaml 同序，宏跟 HAT_HOUSE_ORIGINAL 一起切
 #if HAT_HOUSE_ORIGINAL
 static const uint8_t* HOUSE_PHRASE[4]  = { PH_HOUSE_COURAGE_ORIG, PH_HOUSE_AMBITION_ORIG,
                                            PH_HOUSE_WISDOM_ORIG,  PH_HOUSE_LOYALTY_ORIG };

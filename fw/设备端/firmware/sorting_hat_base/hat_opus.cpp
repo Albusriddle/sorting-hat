@@ -1,11 +1,8 @@
 // ============================================================
 // hat_opus.cpp —— Opus 编解码实现
 //
-// 用 pschatzmann/arduino-audio-tools 里的 OpusAudioEncoder / OpusAudioDecoder。
-// 它内部调用 Espressif 的 esp-opus，S3 上可用；C3 上未验证（见 hat_config.h）。
-//
-// 关掉 HAT_ENABLE_OPUS 时本文件什么也不做，所有函数返回失败，
-// 上层自动退回 PCM 路径（0x04 上行、PCM 下行）。
+// 用 arduino-audio-tools 的 OpusAudioEncoder / Decoder，底层是 esp-opus。
+// 关掉 HAT_ENABLE_OPUS 时全部返回失败，上层自动退回 PCM。
 // ============================================================
 #include "hat_opus.h"
 #include "hat_config.h"
@@ -47,7 +44,7 @@ size_t opus_encode(const int16_t* pcm, size_t samples, uint8_t* out, size_t outC
   const uint8_t* in = (const uint8_t*)pcm;
   size_t inLeft = samples * sizeof(int16_t);
 
-  // AudioStream::write 返回"写进编码器的输入字节数"，编码结果通过 readBytes 拿出来
+  // write 返回吃进去的字节数，编码结果用 readBytes 取
   size_t wrote = s_enc.write((const uint8_t*)in, inLeft);
   if (wrote != inLeft) return 0;
 
@@ -69,8 +66,7 @@ void opus_set_rate(uint32_t hz) {
   }
 }
 
-// 判断"解出来的东西像不像正常语音"：
-// 全零、或者在 60 ms 里几乎没有变化的，都当成不是 Opus。
+// 解码结果像不像真语音：全零或幅度几乎不变，就当不是 Opus
 static bool plausible_pcm(const int16_t* pcm, size_t n) {
   if (n < 64) return false;
   int32_t minV = 32767, maxV = -32768;
@@ -82,8 +78,7 @@ static bool plausible_pcm(const int16_t* pcm, size_t n) {
     energy += (v < 0 ? -v : v);
   }
   energy /= (int32_t)n;
-  // 完全没有能量（全零）或者幅度几乎不变，都不可信
-  if (energy == 0 && minV == maxV) return false;
+  if (energy == 0 && minV == maxV) return false;           // 全零或没起伏，不可信
   return true;
 }
 
@@ -94,7 +89,7 @@ bool opus_decode_or_passthrough(const uint8_t* payload, size_t len,
 
   s_dec.write(payload, len);
   size_t avail = s_dec.available();
-  if (avail < sizeof(int16_t) * 32) return false;          // 解出来太短，可能是误判
+  if (avail < sizeof(int16_t) * 32) return false;          // 太短，多半是误判
   size_t bytes = avail;
   if (bytes > pcmCap * sizeof(int16_t)) bytes = pcmCap * sizeof(int16_t);
 

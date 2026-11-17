@@ -1,22 +1,17 @@
 // ============================================================
 // hat_comm.cpp —— Wi-Fi + WebSocket + 协议编解码
 //
-// 协议以 host/app/protocol.py 为准（2026-11-16 用 probe.py 实测过）：
-//   文本：{"type": ...}       （不是老文档里的 "t"）
-//   上行 0x01 Opus / 0x04 PCM16k，后面跟 seq(u32 BE)
-//   下行 0x02 + seq(u32 BE) + 载荷（可能是 Opus，也可能是裸 PCM）
-//   下行的帧是 60 ms / 960 样本；上行我们发 20 ms / 320 样本
-//
-// 实测的一个坑：ready.audio.out 报 "24k"，但实际载荷算出来是 16 kHz。
-// 所以解码采样率以"算出来的"为准，报的值只做参考 —— 见 guess_out_rate()。
+// 协议以 host/app/protocol.py 为准：
+//   文本 {"type": ...}；上行 0x01 Opus / 0x04 PCM16k，带 seq(u32 BE)；
+//   下行 0x02 + seq + 载荷，60 ms / 960 样本。
+// ready.audio.out 报的采样率不可信，以帧长算出来的为准（见 on_bin）。
 // ============================================================
 #include "hat_comm.h"
 #include "hat_config.h"
 #include "hat_state.h"
 #include "hat_hw.h"
 #include "hat_opus.h"
-// secrets.h 存的是自己热点和电脑 IP，不进 git（见 .gitignore）。
-// 没复制 secrets.h 时自动退回模板，保证 clone 下来能直接编译。
+// secrets.h 存热点和电脑 IP，不进 git；没有时退回模板，保证 clone 下来能编
 #if __has_include("secrets.h")
 #include "secrets.h"
 #else
@@ -104,7 +99,7 @@ static void on_text(uint8_t* payload, size_t len) {
     const char* in  = doc["audio"]["in"]  | "?";
     const char* out = doc["audio"]["out"] | "?";
     uint32_t declared = parse_rate(out);
-    // 实测：报 24k，实际 16k。先用报的值，后面 play 时会按帧长校正。
+    // 报的值可能不准（曾报 24k 实际 16k），先用它，play 时再按帧长校正
     if (declared) { s_spkRate = declared; opus_set_rate(declared); }
     Serial.printf("[NET] sid=%s in=%s out=%s (spk=%lu)\n",
                   (const char*)(doc["sid"] | "?"), in, out, (unsigned long)s_spkRate);
@@ -114,20 +109,18 @@ static void on_text(uint8_t* payload, size_t len) {
     const char* st = doc["state"] | "";
     Serial.printf("[WS-RX] tts %s text=\"%s\"\n", st, (const char*)(doc["text"] | ""));
     if (strcmp(st, "start") == 0) {
-      // S-07：把 host 的桥接句交给 CSK4002 念（speakUTF8 内部转 UNICODE）
+      // 把桥接句交给 CSK4002 念（speakUTF8 内部转 UNICODE）
       const char* txt = doc["text"] | "";
       if (txt[0]) tts.speakUTF8(txt);
       hat_ts_stamp(&HatTs::t5a);
       hw_speaker_open(s_spkRate);
       hw_mic_enable(false);                  // 半双工：帽子说话时关麦
-      // 注意：必须走 comm_go() 而不是 hat_go()，否则 .ino 里的 on_enter_state()
-      // 不会被调用，麦克风就永远恢复不了（念完一次帽子就再也听不见了）。
+      // 必须走 comm_go()：hat_go() 不触发 on_enter_state()，麦开了就再也不会关
       if (hat_state_get() == HatState::THINKING) comm_go(HatState::SPEAKING, "TTS_START");
     } else if (strcmp(st, "stop") == 0) {
       hat_ts_stamp(&HatTs::tStop);
       hat_ts_dump();
-      // 正常结束不调 tts.stop()：让 CSK4002 把句子念完；
-      // 只有 abort/按钮打断才硬停（见 .ino 的 handle_button / case 'b'）。
+      // 正常结束不硬停 TTS，让它把句子念完；abort/按钮才停（见 .ino）
       hw_speaker_stop();
       hw_mic_enable(true);
       if (hat_state_get() == HatState::SPEAKING) comm_go(HatState::ARMED, "TTS_STOP");
@@ -136,8 +129,9 @@ static void on_text(uint8_t* payload, size_t len) {
     const char* house = doc["house"] | "";
     Serial.printf("[WS-RX] result house=%s line=\"%s\"\n",
                   house, (const char*)(doc["line"] | ""));
-    speak_house(house);                      // 念本地预录句，不念 line（里面有【占位】）
-    // 把 t_arm/t0/t5a/t5b 交给上位机算 TTFC；reason=done 表示"本次结束、连接继续"
+    // 念本地预录句，不念 line（里面有占位符）
+    speak_house(house);
+    // 交给上位机算 TTFC；done = 本轮结束，连接不断
     comm_send_bye("done");
   } else if (strcmp(type, "error") == 0) {
     Serial.printf("[WS-RX] error code=%s degrade=%s fatal=%d\n",
@@ -173,7 +167,7 @@ static void on_bin(uint8_t* payload, size_t len) {
     if (logCount++ < 5) Serial.printf("[WS-BIN] opus -> %u samples\n", (unsigned)pcmN);
     hw_speaker_play((const uint8_t*)s_decBuf, pcmN * sizeof(int16_t));
   } else {
-    // 裸 PCM。用帧长反推采样率并校正（实测 1920 字节 = 960 样本 = 16 kHz / 60 ms）
+    // 裸 PCM：用帧长反推采样率（1920 字节 = 960 样本 = 16 kHz / 60 ms）
     size_t samples = n / sizeof(int16_t);
     static uint16_t pcmLogCount = 0;
     if (pcmLogCount < 5) {
@@ -231,13 +225,12 @@ void comm_begin() {
     Serial.println(" FAIL（继续跑，串口命令照样能用）");
   }
 
-  // 顺序很重要：回调要在 begin 之前注册，否则上位机连上立刻发的 ready 会丢
+  // 先注册回调再 begin，否则上位机连上立刻发的 ready 会丢
   s_ws.onEvent(on_ws_event);
   s_ws.setReconnectInterval(RECONNECT_MS);
   s_ws.setAuthorization("Bearer " TOKEN);
   s_ws.enableHeartbeat(HEARTBEAT_MS, 3000, 2);
-  // token 同时走 query 参数：实测上位机对 Authorization 头判成 403，
-  // 但 device_app.py 的 _authorized() 也认 ?token=...，这条路一定通。
+  // token 同时走 query：上位机对 Authorization 头判 403，?token= 能过
   static char s_path[96];
   snprintf(s_path, sizeof(s_path), "/v1/voice?token=%s", TOKEN);
   s_ws.begin(HOST_IP, HOST_PORT, s_path, "sortinghat.voice.v1");
@@ -295,9 +288,8 @@ static void send_json2(const char* type, const char* key, const char* val) {
 
 void comm_send_abort(const char* reason) { send_json2("abort", "reason", reason); }
 
-// 把观众说的话发给上位机。上位机收到后存进 last_text，
-// speech_end 时 ENGINE.run(..., last_text, ...) 就有了内容，不再依赖云端 ASR。
-// JSON 转义：只处理会破坏 JSON 的两个字符（" 和 \），中文原样保留（UTF-8）。
+// 把观众说的话发给上位机，speech_end 时上位机拿它判院，不走云端 ASR。
+// 只转义 " 和 \（UTF-8 中文原样保留）。
 void comm_send_text(const char* text) {
   if (!s_up || !text) return;
 
@@ -305,7 +297,7 @@ void comm_send_text(const char* text) {
   size_t j = 0;
   for (size_t i = 0; text[i] && j + 2 < sizeof(esc); ++i) {
     char c = text[i];
-    if (c == 34 || c == 92) {        // 34 = 双引号, 92 = 反斜杠，都需要转义
+    if (c == 34 || c == 92) {        // 双引号、反斜杠需要转义
       esc[j++] = 92;
     }
     esc[j++] = c;
@@ -321,7 +313,7 @@ void comm_send_text(const char* text) {
 
 void comm_send_bye(const char* reason) {
   if (!s_up) return;
-  // 带 dev_ts：上位机靠它算 TTFC = t5b − t0（PROGRESS 待办）
+  // 带 dev_ts：上位机靠它算 TTFC = t5b − t0
   char buf[256];
   int n = snprintf(buf, sizeof(buf),
                    "{\"type\":\"bye\",\"reason\":\"%s\",\"dev_ts\":{\"t_arm\":%lu,\"t0\":%lu,"

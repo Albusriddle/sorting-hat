@@ -1,8 +1,8 @@
 // ============================================================
 // hat_hw.cpp —— 硬件抽象层的实现
 //
-// 每个硬件都被 #ifdef 包着：开关没开时是空实现，代码能编、能跑、不出声。
-// 板上验证一个就打开一个开关，出错时很容易知道是哪个硬件的问题。
+// 每个硬件都由编译开关包着：没开就是空实现，能编能跑不出声。
+// 板上验证一个开一个，出错时也好定位。
 // ============================================================
 #include "hat_hw.h"
 #include "hat_config.h"
@@ -89,7 +89,7 @@ void hw_speaker_open(uint32_t hz) {
   s_spkHz = hz ? hz : AUDIO_HZ;
   s_spkPending = 0;
 #ifdef HAT_ENABLE_SPK
-  // 采样率变了就要重装驱动（ready 里的采样率可能是 16k 或 24k）
+  // 采样率变了要重装驱动（ready 报的可能是 16k 或 24k）
   static bool installed = false;
   static uint32_t installedHz = 0;
   if (installed && installedHz == s_spkHz) return;
@@ -108,8 +108,8 @@ void hw_speaker_play(const uint8_t* pcm, size_t bytes) {
 #ifdef HAT_ENABLE_SPK
   if (!s_spkOk || !pcm || bytes == 0) { s_spkPending = 0; return; }
   size_t written = 0;
-  // 注意：这里会阻塞到 DMA 吃下数据。一帧 60 ms 的音频最多阻塞 60 ms，
-  // 而 WS 接收在本线程里，所以要保证 dma_buf 足够大，避免丢包。
+  // 会阻塞到 DMA 吃下数据（一帧 60 ms 最多阻塞 60 ms），
+  // WS 接收同线程，dma_buf 要够大，否则丢包
   esp_err_t err = i2s_write(I2S_NUM_1, pcm, bytes, &written, pdMS_TO_TICKS(100));
   if (err != ESP_OK || written < bytes) {
     Serial.printf("[SPK] write drop %u/%u bytes\n", (unsigned)(bytes - written), (unsigned)bytes);
@@ -200,8 +200,8 @@ size_t hw_mic_read(int16_t* buf, size_t samples) {
   if (!buf || samples == 0) return 0;
 
 #ifdef HAT_ENABLE_MIC
-  // 麦克风没起来 / 当前关麦：返回 0，让上层跳过这一帧，
-  // 不要返回一整帧静音——那会被当成"真的在收音"，烧板时会严重误导。
+  // 麦克风没起来或关着麦：返回 0 让上层跳过。
+  // 不能返回整帧静音——那会被当成真在收音，烧板时严重误导。
   if (!s_micOk || !s_micOn) return 0;
   size_t want = samples;
   size_t got  = 0;
@@ -234,7 +234,7 @@ static Adafruit_NeoPixel s_strip(LED_COUNT, PIN_LED, NEO_GRB + NEO_KHZ800);
 
 void hw_led_set(int state_index) {
 #ifdef HAT_ENABLE_LED
-  // 颜色与 persona/houses.yaml 一致；亮度限制 30%，别把帽子烤了
+  // 颜色与 persona/houses.yaml 一致；亮度限 30%，别把帽子烤了
   uint32_t c;
   switch (state_index) {
     case 0: c = 0x000000; break;   // OFF      灭

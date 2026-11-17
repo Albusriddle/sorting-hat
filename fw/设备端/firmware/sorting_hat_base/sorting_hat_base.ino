@@ -10,7 +10,7 @@
 #include "tts_xfs5152.h"
 #include "phrases_gbk.h"
 
-// 唤醒词编号在 hat_config.h（5 号）；1–4 号是四句内容（S-08）。
+// 唤醒词编号在 hat_config.h（5 号）；1–4 号是四句内容。
 
 TwoWire TtsBus(1);
 voice::WonderEcho asr;
@@ -39,8 +39,8 @@ static void on_enter_state(HatState s, const char*) {
   }
 }
 
-// 让通信模块（收到 tts start/stop）也能走同一套副作用。
-// lazy init：回调函数 on_enter_state 定义在上面，这里再注册一次，避免顺序问题。
+// 通信模块收到 tts start/stop 时也走同一套副作用。
+// on_enter_state 定义在上面，这里再注册一次，避开初始化顺序问题。
 static bool g_hookReady = false;
 static void ensure_state_hook() {
   if (!g_hookReady) { comm_set_state_handler(on_enter_state); g_hookReady = true; }
@@ -71,7 +71,7 @@ static void poll_asr() {
   uint8_t id = asr.poll(millis());
   if (id == 0) return;
 
-  // 合法编号只有 1..5。开机瞬间 I2C 偶发读到垃圾值（实测出现过 242），
+  // 合法编号只有 1..5。开机瞬间 I2C 会读到垃圾值（见过 242），
   // 不在这里挡掉，会被当成"说了个不存在的词条"往下走。
   if (id > 5) {
     Serial.printf("[ASR] 读到非法编号 %u，忽略\n", id);
@@ -86,10 +86,10 @@ static void poll_asr() {
     return;
   }
 
-  // 观众说的内容：只在 LISTENING 状态下才理，避免 ARMED 待机时误触发
+  // 只有 LISTENING 才认观众的话，ARMED 待机时误触发不理
   if (hat_state_get() == HatState::LISTENING) {
     hat_intent_on_word_id(id);
-    comm_send_vad_start();                   // "听到了" → 上位机停静音计时
+    comm_send_vad_start();                   // "听到了" → 主机停静音计时
 
     for (int i = 0; i < 5; ++i) {            // 补 100ms 音频帧，保持与 e 键一致的节奏
       mic_pump_frame();
@@ -153,7 +153,7 @@ static void handle_serial() {
       break;
 
     case 'a': tts.speakGBK(PH_ASK, sizeof(PH_ASK)); break;
-    // 1-4 = 试听四院预录句，跟着 HAT_HOUSE_ORIGINAL 走（与 hat_comm.cpp 的 speak_house 一致）
+    // 1-4 试听四院预录句，跟着 HAT_HOUSE_ORIGINAL 走（同 speak_house）
     case '1':
 #if HAT_HOUSE_ORIGINAL
       tts.speakGBK(PH_HOUSE_COURAGE_ORIG, sizeof(PH_HOUSE_COURAGE_ORIG)); break;
@@ -185,11 +185,11 @@ static void handle_serial() {
       Serial.println("[ASR] 开始写入词条…");
       if (!asr.eraseWords()) { Serial.println("[ASR] 擦除失败"); break; }
       struct { uint8_t id; const char* py; } words[] = {
-        {5, "kai shi"},                      // ← 第一条；先用官方例程验证过的词排除拼音因素
-        {1, "wo pa shu"},
-        {2, "wo yao de hen da"},
-        {3, "wo xi huan chai kai xiang"},
-        {4, "wo zai hu shen bian"},
+        {5, "kai shi"},                      // 第一条先用官方例程验过的词，排除拼音问题
+        {1, "wo zui pa shu"},                // 我最怕输
+        {2, "wo yao na di yi"},              // 我要拿第一
+        {3, "wo xiang zhi dao wei shen me"}, // 我想知道为什么
+        {4, "wo xiang zhao gu jia ren"},     // 我想照顾家人
       };
       bool allOk = true;
       for (auto& w : words) {
@@ -223,7 +223,7 @@ static void handle_button() {
 
   if (offline_active()) { offline_next_house(); return; }
 
-  // 短按：OFF/ARMED = 手动开始（无模块也能演）；其他状态 = 打断
+  // 短按：OFF/ARMED = 手动开始（没模块也能演），其它状态 = 打断
   if (hat_state_get() == HatState::OFF_ST || hat_state_get() == HatState::ARMED) {
     start_listening("BTN_START");
     return;
@@ -241,7 +241,7 @@ void setup() {
   delay(1200);
   Serial.println("\n===== sorting hat · base =====");
 
-  // 1. 两块幻尔模块（与组长 demo 相同的接法）
+  // 1. 两块幻尔模块（接法同组长 demo）
   TtsBus.begin(PIN_TTS_SDA, PIN_TTS_SCL, 10000);
   tts.beginI2C(TtsBus);
   asr.begin(Wire, PIN_ASR_SDA, PIN_ASR_SCL, 100000);
@@ -299,5 +299,15 @@ void loop() {
     comm_send_bye("timeout");
     tts.speakGBK(PH_TIMEOUT, sizeof(PH_TIMEOUT));
     go(HatState::ARMED, "TIMEOUT");
+  }
+
+  // 思考超时：主机一字未回才自救；已收到 tts start 就等它念完（长台词可能超 22s）
+  if (hat_state_get() == HatState::THINKING &&
+      g_ts.t5a == 0 &&
+      millis() - g_stateAt > THINKING_TIMEOUT_MS) {
+    Serial.println("[ST] THINKING 超时，回 ARMED（可能断网，上位机没回 tts/result）");
+    tts.stop();
+    tts.speakGBK(PH_TIMEOUT, sizeof(PH_TIMEOUT));
+    go(HatState::ARMED, "THINK_TIMEOUT");
   }
 }
